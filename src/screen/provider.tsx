@@ -22,9 +22,15 @@ import {
 let _dispatch: React.Dispatch<ScreenAction> | null = null;
 
 /**
- * 模块级 skip —— 可在 .ts 文件中直接调用
- * 
- * 必须在 <ScenarioManagementProvider> 挂载后使用
+ * Navigate down the tree to a direct child of the current screen.
+ *
+ * @param component  The target child component (must be a registered child
+ *                   of the current screen).
+ * @param params     Props to merge with the component's registered template.
+ * @param options    Optional navigation options.
+ *
+ * @throws If the provider is not mounted or the target is not a child of
+ *         the current screen.
  */
 export function skip<C extends React.ComponentType<any>>(
   component: C,
@@ -50,7 +56,11 @@ export function skip<C extends React.ComponentType<any>>(
   });
 }
 
-/** 模块级 back */
+/**
+ * Navigate up the tree to the parent of the current screen.
+ *
+ * @throws If the provider is not mounted or the current screen is the root.
+ */
 export function back(): void {
   if (!_dispatch) {
     throw new Error(
@@ -60,7 +70,17 @@ export function back(): void {
   _dispatch({ type: 'back' });
 }
 
-/** 模块级 gotoScreen */
+/**
+ * Jump to any registered screen across branches of the tree.
+ *
+ * The path is rebuilt by finding the closest common ancestor between the
+ * current screen and the target, then walking down from that ancestor.
+ *
+ * @param component  The target component (must be registered).
+ * @param params     Props to merge with the component's registered template.
+ *
+ * @throws If the provider is not mounted or the component is not registered.
+ */
 export function gotoScreen<C extends React.ComponentType<any>>(
   component: C,
   params: React.ComponentProps<C>,
@@ -82,7 +102,17 @@ export function gotoScreen<C extends React.ComponentType<any>>(
   });
 }
 
-/** 模块级 overlay */
+/**
+ * Open a floating overlay on top of the current screen stack.
+ *
+ * The overlay renders independently of the tree navigation. Only one overlay
+ * may be active at a time. Opening a new overlay replaces the previous one.
+ *
+ * @param component  The overlay component (must be registered).
+ * @param params     Props to merge with the component's registered template.
+ *
+ * @throws If the provider is not mounted or the component is not registered.
+ */
 export function overlay<C extends React.ComponentType<any>>(
   component: C,
   params: React.ComponentProps<C>,
@@ -104,7 +134,11 @@ export function overlay<C extends React.ComponentType<any>>(
   });
 }
 
-/** 模块级 closeOverlay */
+/**
+ * Close the currently active overlay.
+ *
+ * @throws If the provider is not mounted.
+ */
 export function closeOverlay(): void {
   if (!_dispatch) {
     throw new Error(
@@ -284,6 +318,19 @@ export interface ScenarioManagementProviderProps {
   defaultParams?: Record<string, unknown>;
 }
 
+/**
+ * Screen-management context provider.
+ *
+ * Wraps the application and enables tree-based screen navigation, overlays,
+ * and module-level navigation functions (`skip`, `back`, `gotoScreen`,
+ * `overlay`, `closeOverlay`).
+ *
+ * @param defaultScreen  The root screen component (must be registered).
+ * @param defaultParams  Optional initial props for the root screen.
+ *
+ * @throws If `defaultScreen` has not been registered via
+ *         {@link registerComponent}.
+ */
 export function ScenarioManagementProvider({
   children,
   defaultScreen,
@@ -332,9 +379,9 @@ export function ScenarioManagementProvider({
     () =>
       state.overlay
         ? React.createElement(state.overlay.component, {
-            ...state.overlay.params,
-            key: `overlay-${state.counter}`,
-          })
+          ...state.overlay.params,
+          key: `overlay-${state.counter}`,
+        })
         : null,
     [state.overlay, state.counter],
   );

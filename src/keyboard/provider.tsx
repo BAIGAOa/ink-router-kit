@@ -11,6 +11,7 @@ import {
   KeyHandler,
   BoundKeyboardOptions,
   BoundKeyEntry,
+  ScreenKeyboardLayer,
 } from './types.js';
 import { useScreenSystem } from '../screen/hook.js';
 
@@ -25,14 +26,19 @@ let _currentOverlayComponent: React.ComponentType<any> | null = null;
 
 
 /**
- * 将 Ink 的 (input, key) 转换为可匹配的按键名列表
- * 
- * 例如：按 ctrl+s → ["ctrl+s", "ctrl+shift+s"?]（取决于是否同时按了 shift）
- *       按 return → ["return"]
- *       按 Escape → ["escape"]
- * 
- * Ink 7 注意：key.meta 仅对 Alt/Meta 组合键为 true，不再对 Escape 触发。
+ * Convert an Ink `(input, key)` event into a list of possible key-name
+ * strings for matching.
+ *
+ * For special keys (return, escape, arrows, etc.) it produces the base
+ * name plus any modifier-prefixed variants.  For character keys it
+ * produces the raw character and modifier combinations.
+ *
+ * Examples:
+ *   press('s', { ctrl: true })  →  ["s", "ctrl+s"]
+ *   press('',  { escape: true }) → ["escape"]
+ *   press('',  { return: true, shift: true }) → ["return", "shift+return"]
  */
+
 function normalizeKeyNames(input: string, key: Key): string[] {
   const names: string[] = [];
 
@@ -82,6 +88,19 @@ export interface KeyboardProviderProps {
   children: ReactNode;
 }
 
+/**
+ * Keyboard context provider for layered key handling.
+ *
+ * Manages per-screen-layer key bindings, transparent keys (`blockedKey`),
+ * and key-stop propagation barriers (`stop`). Handles the full event
+ * priority chain:
+ *   1. Active overlay layer
+ *   2. Screen stack (top → bottom)
+ *   3. Drop unhandled keys
+ *
+ * Must be nested inside a {@link ScenarioManagementProvider} so that the
+ * current screen path is available for layer management.
+ */
 export function KeyboardProvider({ children }: KeyboardProviderProps) {
   const { currentPath, currentOverlay } = useScreenSystem();
 
@@ -97,7 +116,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   const layersRef = useRef<
     Map<
       React.ComponentType<any>,
-      { bindings: BoundKeyEntry[]; blockedKeys: string[] }
+      ScreenKeyboardLayer
     >
   >(new Map());
 
@@ -117,12 +136,10 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
   // 获取或创建指定组件的层
   const getLayer = useCallback(
-    (
-      owner: React.ComponentType<any>,
-    ): { bindings: BoundKeyEntry[]; blockedKeys: string[] } => {
+    (owner: React.ComponentType<any>) => {
       let layer = layersRef.current.get(owner);
       if (!layer) {
-        layer = { bindings: [], blockedKeys: [] };
+        layer = { bindings: [], blockedKeys: [], stoppedKeys: [] };
         layersRef.current.set(owner, layer);
       }
       return layer;
@@ -130,7 +147,12 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     [],
   );
 
-
+  /**
+ * Bind keys on the current (top-of-stack) screen component.
+ *
+ * The owner is automatically set to the current top-of-stack component.
+ * Returns an unbind function for cleanup.
+ */
   const boundKeyboard = useCallback(
     (
       keys: string[],
@@ -166,8 +188,13 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     [getLayer],
   );
 
-
-  const blockedKey = useCallback(
+  /**
+ * Mark keys as transparent on the current layer.
+ *
+ * When a transparent key reaches this layer, the layer's own bindings
+ * are skipped and the key propagates to the next layer below.
+ */
+  const penetration = useCallback(
     (keys: string[]) => {
       const path = _currentPath;
       if (path.length === 0) {
@@ -187,61 +214,100 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     [getLayer],
   );
 
+   /**
+ * Prevent keys from propagating beyond the current (top-of-stack) layer.
+ *
+ * The layer's own bindings are evaluated first — only if no binding
+ * matches does the stop take effect, consuming the key so that lower
+ * layers never see it. The returned unstop function removes the keys.
+ */
+  const stop = useCallback(
+    (keys: string[]): (() => void) => {
+      const path = _currentPath;
+      if (path.length === 0) {
+        throw new Error('[Ink-Trc] stop() 必须在屏幕组件内调用。');
+      }
+      const owner = path[path.length - 1];
+      const layer = getLayer(owner);
+
+      const added: string[] = [];
+      for (const k of keys) {
+        if (!layer.stoppedKeys.includes(k)) {
+          layer.stoppedKeys.push(k);
+          added.push(k);
+        }
+      }
+
+      return () => {
+        for (const k of added) {
+          const idx = layer.stoppedKeys.indexOf(k);
+          if (idx !== -1) layer.stoppedKeys.splice(idx, 1);
+        }
+      };
+    },
+    [getLayer],
+  );
+
 
   const value = useMemo(
-    () => ({ boundKeyboard, blockedKey }),
-    [boundKeyboard, blockedKey],
+    () => ({ boundKeyboard, blockedKey: penetration, stop }),
+    [boundKeyboard, penetration],
   );
 
 
   useInput((input, key) => {
     const eventNames = normalizeKeyNames(input, key);
 
-    // 优先级 1：Overlay
     const overlayComp = _currentOverlayComponent;
     if (overlayComp) {
       const overlayLayer = layersRef.current.get(overlayComp);
       if (overlayLayer) {
         const blocked = overlayLayer.blockedKeys;
         const unblocked = eventNames.filter((n) => !blocked.includes(n));
+
         if (unblocked.length > 0) {
           for (const binding of overlayLayer.bindings) {
             if (binding.keys.some((k) => unblocked.includes(k))) {
               binding.handler(input, key);
-              return; // overlay 处理了，停止传播
+              return;
             }
           }
+        }
+
+        // overlay 层 stop 阻断整个屏幕栈
+        if (eventNames.some((n) => overlayLayer.stoppedKeys.includes(n))) {
+          return;
         }
       }
     }
 
-    // 优先级 2：屏幕栈顶 → 栈底冒泡
     const path = _currentPath;
     for (let i = path.length - 1; i >= 0; i--) {
       const comp = path[i];
       const layer = layersRef.current.get(comp);
       if (!layer) continue;
 
-      // blockedKey 过滤
+      const isTop = i === path.length - 1;
+
       const blocked = layer.blockedKeys;
       const unblocked = eventNames.filter((n) => !blocked.includes(n));
 
-      // 全部被屏蔽 → 跳过本层
-      if (unblocked.length === 0) continue;
-
-      for (const binding of layer.bindings) {
-        // onlyThis：非栈顶时跳过
-        // onlyThis：仅在 (1) 本层是栈顶 且 (2) 无 overlay 激活时生效
-        if (binding.onlyThis && (i !== path.length - 1 || _currentOverlayComponent !== null)) continue;
-        
-        if (binding.keys.some((k) => unblocked.includes(k))) {
-          binding.handler(input, key);
-          return; // 处理了，停止冒泡
+      if (unblocked.length > 0) {
+        for (const binding of layer.bindings) {
+          if (binding.onlyThis && (i !== path.length - 1 || _currentOverlayComponent !== null)) continue;
+          if (binding.keys.some((k) => unblocked.includes(k))) {
+            binding.handler(input, key);
+            return;
+          }
         }
+      }
+
+      // 仅栈顶层可阻断向下传播；先检查绑定再检查 stop（stop 不影响本层绑定）
+      if (isTop && eventNames.some((n) => layer.stoppedKeys.includes(n))) {
+        return;
       }
     }
 
-    // 优先级 3：无任何层处理 → 丢弃
   });
 
   return (

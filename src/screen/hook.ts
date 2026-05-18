@@ -2,9 +2,14 @@ import { useContext } from 'react';
 import { ScreenSystemContext, ScreenSystemContextValue } from './context.js';
 
 /**
- * 获取屏幕系统能力
- * 
- * 必须在 <ScenarioManagementProvider> 内部使用
+ * Access the screen-management API from within a React component.
+ *
+ * Returns `{ currentScreen, currentOverlay, currentPath, skip, back,
+ * gotoScreen, overlay, closeOverlay }`.
+ *
+ * Must be used inside a {@link ScenarioManagementProvider}.
+ *
+ * @throws If no provider is found in the component tree.
  */
 export function useScreenSystem(): ScreenSystemContextValue {
   const ctx = useContext(ScreenSystemContext);

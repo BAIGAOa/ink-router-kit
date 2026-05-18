@@ -3,11 +3,11 @@ import { Box } from 'ink';
 import { useScreenSystem } from './hook.js';
 
 /**
- * 渲染当前屏幕和 overlay
- * 
- * 可选放置在组件树的任意位置。
- * overlay 激活时：底层屏幕 + overlay 同时渲染（overlay 在视觉上层）
- * 无 overlay 时：只渲染栈顶屏幕
+ * Render the current screen and any active overlay.
+ *
+ * When no overlay is open only the top-of-stack screen is rendered.
+ * When an overlay is open both the underlying screen and the overlay
+ * are rendered together (overlay on top).
  */
 export function CurrentScreen(): React.ReactNode {
   const { currentScreen, currentOverlay } = useScreenSystem();

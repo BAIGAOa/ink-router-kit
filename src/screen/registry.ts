@@ -1,5 +1,5 @@
-import React from 'react';
-import type { RegisterOptions } from './types.js';
+import React from "react";
+import type { RegisterOptions } from "./types.js";
 
 /** 单条注册记录 */
 interface RegistryEntry {
@@ -15,11 +15,14 @@ interface RegistryEntry {
 const registry = new Map<React.ComponentType<any>, RegistryEntry>();
 
 /**
- * 注册一个组件到屏幕系统
- * 
- * @param component  组件本身（作为唯一标识）
- * @param template   参数模板对象（提供默认值和类型推断）
- * @param options    可选配置（如 parent）
+ * Register a component as a screen in the navigation tree.
+ *
+ * @param component  The React component (used as the unique token).
+ * @param template   Default props for the component.
+ * @param options    Optional registration options (e.g. `parent` to attach
+ *                   the component under an existing node in the tree).
+ *
+ * @throws If the component has already been registered.
  */
 export function registerComponent<C extends React.ComponentType<any>>(
   component: C,
@@ -28,7 +31,7 @@ export function registerComponent<C extends React.ComponentType<any>>(
 ): void {
   if (registry.has(component)) {
     throw new Error(
-      `[Ink-Trc] 组件 "${component.displayName || component.name || 'anonymous'}" 已注册，不能重复注册。`,
+      `[Ink-Trc] 组件 "${component.displayName || component.name || "anonymous"}" 已注册，不能重复注册。`,
     );
   }
 
@@ -70,9 +73,7 @@ export function getChildren(
 }
 
 /** 检查组件是否已注册 */
-export function hasComponent(
-  component: React.ComponentType<any>,
-): boolean {
+export function hasComponent(component: React.ComponentType<any>): boolean {
   return registry.has(component);
 }
 

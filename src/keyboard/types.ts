@@ -1,38 +1,45 @@
-import type { Key } from 'ink';
-
-/** 按键处理回调 */
+/**
+ * Keyboard callback, matching Ink's `useInput` signature.
+ *
+ * @param input  The raw character string (empty for special keys).
+ * @param key    The key descriptor (booleans for special keys, modifiers).
+ */
 export type KeyHandler = (input: string, key: Key) => void;
 
-/** boundKeyboard 的选项 */
+/**
+ * Options for {@link KeyboardContextValue.boundKeyboard}.
+ */
 export interface BoundKeyboardOptions {
-  /** 只在当前层是栈顶时生效，非栈顶时穿透 */
+  /**
+   * When `true`, the binding only activates when the owning screen is the
+   * top of the stack and no overlay is open. Otherwise the binding is
+   * ignored and the key continues to bubble down.
+   */
   onlyThis?: boolean;
 }
 
-/** 单条已绑定的按键记录 */
+/**
+ * A single key-binding entry stored on a screen layer.
+ */
 export interface BoundKeyEntry {
-  /** 按键名列表（如 ["s", "return", "ctrl+q"]） */
+  /** Normalized key names to match. */
   keys: string[];
-  /** 处理函数 */
+  /** Handler to invoke on match. */
   handler: KeyHandler;
-  /** 是否仅在本层栈顶时激活 */
+  /** Whether this binding requires the owner to be stack top. */
   onlyThis: boolean;
-  /** 所属屏幕组件（用于生命周期管理） */
+  /** The screen component that owns this binding. */
   owner: React.ComponentType<any>;
 }
 
-/** 单条屏蔽的按键记录 */
-export interface BlockedKeyEntry {
-  /** 按键名列表 */
-  keys: string[];
-  /** 所属屏幕组件 */
-  owner: React.ComponentType<any>;
-}
-
-/** 键盘绑定上下文——每层屏幕维护自己的绑定 */
+/**
+ * Per-layer keyboard state: bindings, transparent keys, and stop keys.
+ */
 export interface ScreenKeyboardLayer {
-  /** 本层的按键绑定列表（按注册顺序） */
+  /** Registered key bindings (evaluation order). */
   bindings: BoundKeyEntry[];
-  /** 本层的屏蔽键列表 */
+  /** Keys marked as transparent on this layer (pass-through). */
   blockedKeys: string[];
+  /** Keys stopped on this layer (propagation barrier). */
+  stoppedKeys: string[];
 }
