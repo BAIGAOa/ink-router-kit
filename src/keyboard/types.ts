@@ -1,3 +1,5 @@
+import type { Key } from 'ink';
+
 /**
  * Keyboard callback, matching Ink's `useInput` signature.
  *
@@ -42,4 +44,52 @@ export interface ScreenKeyboardLayer {
   blockedKeys: string[];
   /** Keys stopped on this layer (propagation barrier). */
   stoppedKeys: string[];
+  /** Keys from globalKeys that this layer has overridden (only set when cover=true). */
+  globalKeyOverrides: Set<string>;
+}
+
+/**
+ * A single global key definition.
+ *
+ * Global keys fire regardless of the screen stack (subject to
+ * `category` whitelist and `affectOverlay` placement).
+ */
+export interface GlobalKeyEntry {
+  /**
+   * Key name(s) to match.
+   *
+   * Supports single string or array. Uses the same normalized key-name
+   * format as `boundKeyboard` (`"s"`, `"ctrl+q"`, `"return"`, etc.).
+   */
+  key: string | string[];
+
+  /** Callback to invoke when the key is pressed. */
+  operate: () => void;
+
+  /**
+   * Whether screen components are allowed to override this global key
+   * via `boundKeyboard`. Defaults to `true`.
+   *
+   * When `false`, calling `boundKeyboard` with the same key while the
+   * current screen is in the global key's `category` whitelist will
+   * throw a runtime error.
+   */
+  cover?: boolean;
+
+  /**
+   * Whether this global key fires before the overlay layer.
+   *
+   * - `false` (default): Overlay → global key → screen stack
+   * - `true`:            Global key → overlay → screen stack
+   */
+  affectOverlay?: boolean;
+
+  /**
+   * Whitelist of screen components that may use this global key.
+   *
+   * - `"*"` or omitted: all screens
+   * - `[]`: no screens (effectively disabled)
+   * - `[Menu, Game]`: only when the stack top is exactly Menu or Game
+   */
+  category?: React.ComponentType<any>[] | '*';
 }

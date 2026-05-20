@@ -12,18 +12,13 @@ import {
   BoundKeyboardOptions,
   BoundKeyEntry,
   ScreenKeyboardLayer,
+  GlobalKeyEntry,
 } from './types.js';
 import { useScreenSystem } from '../screen/hook.js';
 
-
-
-/** 当前屏幕路径（由 Provider 同步更新） */
 let _currentPath: React.ComponentType<any>[] = [];
-
-/** 当前 overlay 组件类型（由 Provider 同步更新） */
 let _currentOverlayComponent: React.ComponentType<any> | null = null;
-
-
+let _globalKeys: GlobalKeyEntry[] = [];
 
 /**
  * Convert an Ink `(input, key)` event into a list of possible key-name
@@ -38,11 +33,9 @@ let _currentOverlayComponent: React.ComponentType<any> | null = null;
  *   press('',  { escape: true }) → ["escape"]
  *   press('',  { return: true, shift: true }) → ["return", "shift+return"]
  */
-
 function normalizeKeyNames(input: string, key: Key): string[] {
   const names: string[] = [];
 
-  // 特殊键（Ink 7 支持的完整列表）
   const specialMap: Array<[keyof Key, string]> = [
     ['return', 'return'],
     ['escape', 'escape'],
@@ -61,17 +54,14 @@ function normalizeKeyNames(input: string, key: Key): string[] {
 
   for (const [kProp, kName] of specialMap) {
     if (key[kProp]) {
-      // 基础名
       names.push(kName);
-      // 带修饰符的组合名
       if (key.ctrl) names.push(`ctrl+${kName}`);
       if (key.shift) names.push(`shift+${kName}`);
       if (key.meta) names.push(`meta+${kName}`);
-      return names; // 特殊键直接返回，不继续处理普通字符
+      return names;
     }
   }
 
-  // 普通字符键
   if (input) {
     names.push(input);
     if (key.ctrl) names.push(`ctrl+${input}`);
@@ -83,6 +73,31 @@ function normalizeKeyNames(input: string, key: Key): string[] {
   return names;
 }
 
+function checkGlobalKey(
+  entry: GlobalKeyEntry,
+  eventNames: string[],
+  topComponent: React.ComponentType<any> | null,
+  layersRef: React.MutableRefObject<Map<React.ComponentType<any>, ScreenKeyboardLayer>>,
+): boolean {
+  const keyNames = Array.isArray(entry.key) ? entry.key : [entry.key];
+  if (!keyNames.some((k) => eventNames.includes(k))) return false;
+  if (!topComponent) return false;
+
+  const cat = entry.category;
+  if (cat === undefined || cat === '*') {
+  } else if (Array.isArray(cat) && cat.length === 0) {
+    return false;
+  } else if (Array.isArray(cat)) {
+    if (!cat.includes(topComponent)) return false;
+  }
+
+  const topLayer = layersRef.current.get(topComponent);
+  if (topLayer) {
+    if (keyNames.some((k) => topLayer.globalKeyOverrides.has(k))) return false;
+  }
+
+  return true;
+}
 
 export interface KeyboardProviderProps {
   children: ReactNode;
@@ -92,11 +107,13 @@ export interface KeyboardProviderProps {
  * Keyboard context provider for layered key handling.
  *
  * Manages per-screen-layer key bindings, transparent keys (`blockedKey`),
- * and key-stop propagation barriers (`stop`). Handles the full event
- * priority chain:
- *   1. Active overlay layer
- *   2. Screen stack (top → bottom)
- *   3. Drop unhandled keys
+ * key-stop propagation barriers (`stop`), and global keys (`globalKeys`).
+ * Handles the full event priority chain:
+ *   1. Global keys with `affectOverlay: true`
+ *   2. Active overlay layer
+ *   3. Global keys with `affectOverlay: false` (default)
+ *   4. Screen stack (top → bottom)
+ *   5. Drop unhandled keys
  *
  * Must be nested inside a {@link ScenarioManagementProvider} so that the
  * current screen path is available for layer management.
@@ -104,15 +121,12 @@ export interface KeyboardProviderProps {
 export function KeyboardProvider({ children }: KeyboardProviderProps) {
   const { currentPath, currentOverlay } = useScreenSystem();
 
-  // 同步模块级变量（render 阶段，先于 children 渲染）
   _currentPath = currentPath;
 
-  // 从 currentOverlay 元素中提取组件类型
   _currentOverlayComponent = currentOverlay
     ? (currentOverlay as React.ReactElement).type as React.ComponentType<any>
     : null;
 
-  // 每层的绑定数据：Map<component, layer>
   const layersRef = useRef<
     Map<
       React.ComponentType<any>,
@@ -120,10 +134,8 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     >
   >(new Map());
 
-  // 追踪上一次的路径，用于清理已离开的层
   const prevPathRef = useRef<React.ComponentType<any>[]>([]);
 
-  // 当路径变化时，清理已离开路径的层
   useEffect(() => {
     const prev = prevPathRef.current;
     for (const comp of prev) {
@@ -134,12 +146,16 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     prevPathRef.current = currentPath;
   }, [currentPath]);
 
-  // 获取或创建指定组件的层
   const getLayer = useCallback(
     (owner: React.ComponentType<any>) => {
       let layer = layersRef.current.get(owner);
       if (!layer) {
-        layer = { bindings: [], blockedKeys: [], stoppedKeys: [] };
+        layer = {
+          bindings: [],
+          blockedKeys: [],
+          stoppedKeys: [],
+          globalKeyOverrides: new Set(),
+        };
         layersRef.current.set(owner, layer);
       }
       return layer;
@@ -148,11 +164,11 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   );
 
   /**
- * Bind keys on the current (top-of-stack) screen component.
- *
- * The owner is automatically set to the current top-of-stack component.
- * Returns an unbind function for cleanup.
- */
+   * Bind keys on the current (top-of-stack) screen component.
+   *
+   * The owner is automatically set to the current top-of-stack component.
+   * Returns an unbind function for cleanup.
+   */
   const boundKeyboard = useCallback(
     (
       keys: string[],
@@ -168,6 +184,33 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       const owner = path[path.length - 1];
       const layer = getLayer(owner);
 
+      for (const gk of _globalKeys) {
+        const gkKeys = Array.isArray(gk.key) ? gk.key : [gk.key];
+        const matchingKeys = gkKeys.filter((k) => keys.includes(k));
+        if (matchingKeys.length === 0) continue;
+
+        const cat = gk.category;
+        let inCategory = false;
+        if (cat === undefined || cat === '*') {
+          inCategory = true;
+        } else if (Array.isArray(cat)) {
+          inCategory = cat.includes(owner);
+        }
+
+        if (!inCategory) continue;
+
+        const cover = gk.cover ?? true;
+        if (!cover) {
+          throw new Error(
+            `[Ink-Trc] 组件 "${owner.displayName || owner.name || 'anonymous'}" 尝试通过 boundKeyboard 绑定 "${matchingKeys[0]}"，但该键已被 globalKeys 声明且 cover: false，不允许覆盖。`,
+          );
+        }
+
+        for (const k of matchingKeys) {
+          layer.globalKeyOverrides.add(k);
+        }
+      }
+
       const entry: BoundKeyEntry = {
         keys,
         handler,
@@ -177,7 +220,6 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
       layer.bindings.push(entry);
 
-      // 返回解绑函数
       return () => {
         const idx = layer.bindings.indexOf(entry);
         if (idx !== -1) {
@@ -189,11 +231,11 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   );
 
   /**
- * Mark keys as transparent on the current layer.
- *
- * When a transparent key reaches this layer, the layer's own bindings
- * are skipped and the key propagates to the next layer below.
- */
+   * Mark keys as transparent on the current layer.
+   *
+   * When a transparent key reaches this layer, the layer's own bindings
+   * are skipped and the key propagates to the next layer below.
+   */
   const penetration = useCallback(
     (keys: string[]) => {
       const path = _currentPath;
@@ -214,13 +256,13 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     [getLayer],
   );
 
-   /**
- * Prevent keys from propagating beyond the current (top-of-stack) layer.
- *
- * The layer's own bindings are evaluated first — only if no binding
- * matches does the stop take effect, consuming the key so that lower
- * layers never see it. The returned unstop function removes the keys.
- */
+  /**
+   * Prevent keys from propagating beyond the current (top-of-stack) layer.
+   *
+   * The layer's own bindings are evaluated first — only if no binding
+   * matches does the stop take effect, consuming the key so that lower
+   * layers never see it. The returned unstop function removes the keys.
+   */
   const stop = useCallback(
     (keys: string[]): (() => void) => {
       const path = _currentPath;
@@ -248,17 +290,45 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     [getLayer],
   );
 
-
-  const value = useMemo(
-    () => ({ boundKeyboard, blockedKey: penetration, stop }),
-    [boundKeyboard, penetration],
+  /**
+   * Register global key bindings.
+   *
+   * Global keys fire independently of the screen stack (subject to
+   * `category` whitelist and `affectOverlay` placement).
+   *
+   * Calling this replaces any previously registered global keys.
+   */
+  const globalKeys = useCallback(
+    (entries: GlobalKeyEntry[]) => {
+      _globalKeys = entries;
+    },
+    [],
   );
 
+  const value = useMemo(
+    () => ({
+      boundKeyboard,
+      blockedKey: penetration,
+      stop,
+      globalKeys,
+    }),
+    [boundKeyboard, penetration, stop, globalKeys],
+  );
 
   useInput((input, key) => {
     const eventNames = normalizeKeyNames(input, key);
-
+    const path = _currentPath;
+    const topComponent = path.length > 0 ? path[path.length - 1] : null;
     const overlayComp = _currentOverlayComponent;
+
+    for (const entry of _globalKeys) {
+      if (!entry.affectOverlay) continue;
+      if (checkGlobalKey(entry, eventNames, topComponent, layersRef)) {
+        entry.operate();
+        return;
+      }
+    }
+
     if (overlayComp) {
       const overlayLayer = layersRef.current.get(overlayComp);
       if (overlayLayer) {
@@ -274,14 +344,20 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           }
         }
 
-        // overlay 层 stop 阻断整个屏幕栈
         if (eventNames.some((n) => overlayLayer.stoppedKeys.includes(n))) {
           return;
         }
       }
     }
 
-    const path = _currentPath;
+    for (const entry of _globalKeys) {
+      if (entry.affectOverlay) continue;
+      if (checkGlobalKey(entry, eventNames, topComponent, layersRef)) {
+        entry.operate();
+        return;
+      }
+    }
+
     for (let i = path.length - 1; i >= 0; i--) {
       const comp = path[i];
       const layer = layersRef.current.get(comp);
@@ -294,7 +370,12 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
       if (unblocked.length > 0) {
         for (const binding of layer.bindings) {
-          if (binding.onlyThis && (i !== path.length - 1 || _currentOverlayComponent !== null)) continue;
+          if (
+            binding.onlyThis &&
+            (i !== path.length - 1 || _currentOverlayComponent !== null)
+          )
+            continue;
+
           if (binding.keys.some((k) => unblocked.includes(k))) {
             binding.handler(input, key);
             return;
@@ -302,12 +383,10 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         }
       }
 
-      // 仅栈顶层可阻断向下传播；先检查绑定再检查 stop（stop 不影响本层绑定）
       if (isTop && eventNames.some((n) => layer.stoppedKeys.includes(n))) {
         return;
       }
     }
-
   });
 
   return (

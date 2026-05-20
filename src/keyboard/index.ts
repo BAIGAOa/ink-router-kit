@@ -5,6 +5,6 @@ export type {
   KeyHandler,
   BoundKeyboardOptions,
   BoundKeyEntry,
-  BlockedKeyEntry,
   ScreenKeyboardLayer,
+  GlobalKeyEntry,
 } from './types.js';

@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { KeyHandler, BoundKeyboardOptions } from "./types.js";
+import type { KeyHandler, BoundKeyboardOptions, GlobalKeyEntry } from "./types.js";
 
 export interface KeyboardContextValue {
   /**
@@ -27,6 +27,7 @@ export interface KeyboardContextValue {
    * @param keys  Key names to make transparent.
    */
   blockedKey: (keys: string[]) => void;
+
   /**
    * Prevent one or more keys from propagating to layers below.
    *
@@ -44,6 +45,19 @@ export interface KeyboardContextValue {
    * @returns     An unstop function that removes the keys from the stop list.
    */
   stop: (keys: string[]) => () => void;
+
+  /**
+   * Register global key bindings.
+   *
+   * Global keys fire independently of the screen stack (subject to
+   * `category` whitelist). They are placed in the event chain according
+   * to their `affectOverlay` setting.
+   *
+   * Calling this replaces any previously registered global keys.
+   *
+   * @param entries  Array of global key definitions.
+   */
+  globalKeys: (entries: GlobalKeyEntry[]) => void;
 }
 
 export const KeyboardContext = createContext<KeyboardContextValue | null>(null);

@@ -4,7 +4,7 @@ import { KeyboardContext, KeyboardContextValue } from './context.js';
 /**
  * Access the keyboard API from within a React component.
  *
- * Returns `{ boundKeyboard, blockedKey, stop }`.
+ * Returns `{ boundKeyboard, blockedKey, stop, globalKeys }`.
  *
  * Must be used inside a {@link KeyboardProvider}.
  *

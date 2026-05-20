@@ -9,7 +9,7 @@ export {
   overlay,
   closeOverlay,
   useScreenSystem,
-} from './screen/index.js';
+} from "./screen/index.js";
 
 export type {
   SkipOptions,
@@ -20,19 +20,15 @@ export type {
   CloseOverlayFn,
   RegisterOptions,
   ScenarioManagementProviderProps,
-} from './screen/index.js';
+} from "./screen/index.js";
 
 // ── Keyboard System ────────────────────────────────────────
-export {
-  KeyboardProvider,
-  useKeyboard,
-} from './keyboard/index.js';
+export { KeyboardProvider, useKeyboard } from "./keyboard/index.js";
 
 export type {
   KeyHandler,
   BoundKeyboardOptions,
   BoundKeyEntry,
-  BlockedKeyEntry,
   ScreenKeyboardLayer,
   KeyboardProviderProps,
-} from './keyboard/index.js';
+} from "./keyboard/index.js";
