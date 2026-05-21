@@ -11,7 +11,7 @@
 ## Install
 
 ```bash
-npm install ink-kit
+npm install @baigao_h/ink-kit
 ```
 
 ### Requirements
