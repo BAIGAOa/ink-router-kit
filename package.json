@@ -1,5 +1,5 @@
 {
-    "name": "ink-trc",
+    "name": "ink-kit",
     "version": "0.2.0",
     "description": "Ready-to-use Ink components and screen management system for building terminal UIs.",
     "type": "module",
@@ -18,7 +18,7 @@
     ],
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/BAIGAOa/ink-trc.git"
+        "url": "git+https://github.com/BAIGAOa/ink-kit.git"
     },
     "scripts": {
         "build": "tsc --locale zh-CN",
@@ -56,7 +56,7 @@
         "vitest": "^4.1.5"
     },
     "bugs": {
-        "url": "https://github.com/BAIGAOa/ink-trc/issues"
+        "url": "https://github.com/BAIGAOa/ink-kit/issues"
     },
-    "homepage": "https://github.com/BAIGAOa/ink-trc#readme"
+    "homepage": "https://github.com/BAIGAOa/ink-kit#readme"
 }
