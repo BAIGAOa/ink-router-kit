@@ -1,6 +1,6 @@
 {
     "name": "ink-trc",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "description": "Ready-to-use Ink components and screen management system for building terminal UIs.",
     "type": "module",
     "main": "./dist/index.js",
