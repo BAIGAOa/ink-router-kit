@@ -34,7 +34,7 @@ In ink-kit, **every React component is a "screen"**. Register them into a **scre
 
 ### Layered Keyboard Events
 
-No more global `useInput` cluttered with `if-else` chains. ink-trc's keyboard system maintains **per-screen-layer** key bindings. Events bubble from **top to bottom** through the stack, with three key mechanisms:
+No more global `useInput` cluttered with `if-else` chains. ink-kit's keyboard system maintains **per-screen-layer** key bindings. Events bubble from **top to bottom** through the stack, with three key mechanisms:
 
 - **Blocked Key (blockedKey)** — Let a key pass through the current layer to be handled below
 - **Stop (stop)** — Prevent a key from propagating to layers below
@@ -93,7 +93,7 @@ import {
   useScreenSystem,
   KeyboardProvider,
   useKeyboard,
-} from 'ink-trc';
+} from '@baigao_h/ink-kit';
 
 // ── Register screens ──
 function Menu() {
@@ -148,4 +148,4 @@ Because this is a special custom lightweight library that cannot be adapted to m
 
 ## License
 
-[AGPL-3.0](LICENSE)
+[MIT](LICENSE)
