@@ -2,8 +2,8 @@
 
 > Ready-to-use Ink components and tools for building terminal UI applications.
 
-[![CI](https://github.com/BAIGAOa/ink-trc/actions/workflows/ci.yml/badge.svg)](https://github.com/BAIGAOa/ink-trc/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/ink-trc.svg)](https://www.npmjs.com/package/ink-trc)
+[![CI](https://github.com/BAIGAOa/ink-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/BAIGAOa/ink-trc/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@baigao_h/ink-kit.svg)](https://www.npmjs.com/package/@baigao_h/ink-kit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
