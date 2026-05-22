@@ -26,11 +26,11 @@ npm install @baigao_h/ink-kit
 
 ## Design Philosophy
 
-ink-trc aims to make **screen management** and **keyboard event handling** in Ink applications composable, maintainable, and type-safe.
+ink-kit aims to make **screen management** and **keyboard event handling** in Ink applications composable, maintainable, and type-safe.
 
 ### Screen as Component
 
-In ink-trc, **every React component is a "screen"**. Register them into a **screen tree** via `registerComponent`, then navigate the tree with `skip` / `back` / `gotoScreen`. This design makes screen navigation predictable and eliminates the chaos of hand-written conditional rendering (`if-else` / `switch`).
+In ink-kit, **every React component is a "screen"**. Register them into a **screen tree** via `registerComponent`, then navigate the tree with `skip` / `back` / `gotoScreen`. This design makes screen navigation predictable and eliminates the chaos of hand-written conditional rendering (`if-else` / `switch`).
 
 ### Layered Keyboard Events
 
