@@ -1,6 +1,6 @@
 {
     "name": "@baigao_h/ink-kit",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "Ready-to-use Ink components and screen management system for building terminal UIs.",
     "type": "module",
     "main": "./dist/index.js",
