@@ -80,6 +80,11 @@ Every API provides full TypeScript type inference. Functions like `skip`, `gotoS
 - **[Keyboard System](src/keyboard/README.md)** — `KeyboardProvider`, `useKeyboard`, `boundKeyboard`, `blockedKey`, `stop`, `globalKeys`
 
 ---
+## Documentation for the components
+
+-**[SelectInput](src/components/select/README.md)** — Build your form from the comfort of your terminal
+
+---
 
 ## Quick Overview
 
