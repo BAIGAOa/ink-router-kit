@@ -84,7 +84,7 @@ function normalizeKeyNames(input: string, key: Key): string[] {
 *
 * TODO: Finish the implementation of TextInput as soon as possible
 */
-function _isNormalCharacter(input: string, key: Key): boolean {
+function isNormalCharacter(input: string, key: Key): boolean {
     // 必须有实际字符内容
     if (!input) return false;
 
@@ -665,8 +665,14 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
                   return;
                 }
               }
-            }
 
+              const wildcardBinding = ft.bindings.find(b => b.keys.includes('*'));
+              if (wildcardBinding && isNormalCharacter(input, key)) {
+                wildcardBinding.handler(input, key);
+                return;
+              }
+            }
+            
             if (eventNames.some((n) => ft.stoppedKeys.includes(n))) {
               return;
             }
@@ -680,6 +686,12 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
               binding.handler(input, key);
               return;
             }
+          }
+
+          const wildcardBinding = overlayLayer.bindings.find(b => b.keys.includes('*')); 
+          if (wildcardBinding && isNormalCharacter(input, key)) { 
+            wildcardBinding.handler(input, key); 
+            return; 
           }
         }
 
@@ -747,6 +759,14 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
                 return;
               }
             }
+
+            const wildcardBinding = ft.bindings.find(b => b.keys.includes('*'));
+            if (wildcardBinding && isNormalCharacter(input, key)) {
+              if (!(wildcardBinding.onlyThis && overlayComp !== null)) {
+                wildcardBinding.handler(input, key);
+                return;
+              }
+            }
           }
 
           if (eventNames.some((n) => ft.stoppedKeys.includes(n))) {
@@ -767,6 +787,14 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
             binding.handler(input, key);
             return;
           }
+        }
+
+        const wildcardBinding = layer.bindings.find(b => b.keys.includes('*')); 
+        if (wildcardBinding && isNormalCharacter(input, key)) { 
+          if (!(wildcardBinding.onlyThis && (i !== path.length - 1 || overlayComp !== null))) { 
+            wildcardBinding.handler(input, key); 
+            return; 
+          } 
         }
       }
 
