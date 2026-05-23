@@ -22,16 +22,16 @@ export interface SelectInputProps<T, I extends Item<T> = Item<T>> {
   /**
    * Array to be passed in for UI display, etc.
    */
-  items: Item<I>[];
+  items: I[];
   /**
    * What happens when the user presses Enter
    * Accepts a parameter that represents the currently selected item
    */
-  onSelect: (item: Item<I>) => void;
+  onSelect: (item: I) => void;
   /**
    * UI components for custom rendering
    */
-  itemComponent: React.ComponentType<Item<I> & { isSelected: boolean }>;
+  itemComponent: React.ComponentType<I & { isSelected: boolean }>;
   /**
    * Custom Indicator UI Component
    */

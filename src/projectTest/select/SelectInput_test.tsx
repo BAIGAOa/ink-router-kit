@@ -302,7 +302,7 @@ function GameDemo() {
       </Text>
       <Text>{' '}</Text>
 
-      {/* @ts-expect-error – generic inference quirk */}
+      
       <SelectInput<string>
         items={weaponItems}
         onSelect={(item) => setWeapon(item.value)}
