@@ -40,7 +40,7 @@ export interface KeyboardContextValue {
    * @param options  If `focusId` is provided, marks transparent only
    *                 within that focus target.
    */
-  penetration: (keys: string[], options?: BlockedKeyOptions) => void;
+  blockedKey: (keys: string[], options?: BlockedKeyOptions) => void;
 
   /**
    * Prevent one or more keys from propagating to layers below.
