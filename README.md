@@ -1,4 +1,4 @@
-## ink-kit
+## ink-router-kit
 
 > Ready-to-use Ink components and tools for building terminal UI applications.
 
