@@ -40,6 +40,12 @@ No more global `useInput` cluttered with `if-else` chains. ink-kit's keyboard sy
 - **Stop (stop)** — Prevent a key from propagating to layers below
 - **Global Key (globalKeys)** — Shortcuts independent of the screen stack
 
+#### Finer-grained partitioning
+
+There is also competition between levels, so we also have a **focus system**
+Each level has a focus layer, and only the activated focus is eligible to perform its own operation
+**See the API documentation for details.**
+
 ### Module-Level Functions
 
 Navigation functions (`skip`, `back`, `gotoScreen`, etc.) work both inside React components (via hooks) and as **module-level imports** in any `.ts` / `.tsx` file. This allows non-UI layers — game engines, state managers, etc. — to trigger screen transitions.
