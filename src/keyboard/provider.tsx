@@ -147,6 +147,10 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
   const prevPathRef = useRef<React.ComponentType<any>[]>([]);
 
+  // 覆盖层是独立的
+  const prevOverlayRef = useRef<React.ComponentType<any> | null>(null);
+
+
   useEffect(() => {
     const prev = prevPathRef.current;
     for (const comp of prev) {
@@ -156,6 +160,16 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     }
     prevPathRef.current = currentPath;
   }, [currentPath]);
+
+  // Fix: 添加覆盖层的清理逻辑
+  useEffect(() => {
+    if (prevOverlayRef.current && !currentOverlay) {
+      layersRef.current.delete(prevOverlayRef.current); 
+    }
+    prevOverlayRef.current = currentOverlay
+      ? (currentOverlay as React.ReactElement).type as React.ComponentType<any>
+      : null;
+  }, [currentOverlay])
 
   const getLayer = useCallback(
     (owner: React.ComponentType<any>) => {
@@ -195,7 +209,8 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           '[Ink-Trc] boundKeyboard() 必须在屏幕组件内调用。当前无活跃屏幕。',
         );
       }
-      const owner = path[path.length - 1];
+      const owner = _currentOverlayComponent || path[path.length - 1];
+      console.log('[boundKeyboard] owner:', owner?.displayName || owner?.name, '| overlay:', !!_currentOverlayComponent, '| keys:', keys);
       const layer = getLayer(owner);
 
 
@@ -257,11 +272,11 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           if (idx !== -1) target!.bindings.splice(idx, 1);
 
           for (const k of entry.keys) {
-            const stillBound = 
-            layer.bindings.some(b => b.keys.includes(k)) ||
-              [...layer.focusTargets.values()].some(ft => 
+            const stillBound =
+              layer.bindings.some(b => b.keys.includes(k)) ||
+              [...layer.focusTargets.values()].some(ft =>
                 ft.bindings.some(b => b.keys.includes(k))
-            );
+              );
             if (!stillBound) {
               layer.globalKeyOverrides.delete(k);
             }
@@ -317,9 +332,9 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
         // 检查是否需要把全局键给剔除
         for (const k of entry.keys) {
-          const stillBound = 
+          const stillBound =
             layer.bindings.some(b => b.keys.includes(k)) ||
-            [...layer.focusTargets.values()].some(ft => 
+            [...layer.focusTargets.values()].some(ft =>
               ft.bindings.some(b => b.keys.includes(k))
             );
           if (!stillBound) {
@@ -343,7 +358,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       if (path.length === 0) {
         throw new Error('[Ink-Trc] blockedKey() 必须在屏幕组件内调用。');
       }
-      const owner = path[path.length - 1];
+      const owner = _currentOverlayComponent || path[path.length - 1];
       const layer = getLayer(owner);
 
       if (options?.focusId) {
@@ -388,7 +403,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       if (path.length === 0) {
         throw new Error('[Ink-Trc] stop() 必须在屏幕组件内调用。');
       }
-      const owner = path[path.length - 1];
+      const owner = _currentOverlayComponent || path[path.length - 1];
       const layer = getLayer(owner);
 
       if (options?.focusId) {
@@ -446,7 +461,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     (focusId: string) => {
       const path = _currentPath;
       if (path.length === 0) return;
-      const owner = path[path.length - 1];
+      const owner = _currentOverlayComponent || path[path.length - 1];
       const layer = layersRef.current.get(owner);
       if (!layer || !layer.focusTargets.has(focusId)) return;
       if (layer.currentFocusId !== focusId) {
@@ -460,7 +475,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   const focusNext = useCallback(() => {
     const path = _currentPath;
     if (path.length === 0) return;
-    const owner = path[path.length - 1];
+    const owner = _currentOverlayComponent || path[path.length - 1];
     const layer = layersRef.current.get(owner);
     if (!layer || layer.focusOrder.length === 0) return;
 
@@ -474,7 +489,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   const focusPrev = useCallback(() => {
     const path = _currentPath;
     if (path.length === 0) return;
-    const owner = path[path.length - 1];
+    const owner = _currentOverlayComponent || path[path.length - 1];
     const layer = layersRef.current.get(owner);
     if (!layer || layer.focusOrder.length === 0) return;
 
@@ -488,7 +503,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   const focusCurrent = useCallback((): string | null => {
     const path = _currentPath;
     if (path.length === 0) return null;
-    const owner = path[path.length - 1];
+    const owner = _currentOverlayComponent || path[path.length - 1];
     const layer = layersRef.current.get(owner);
     return layer?.currentFocusId ?? null;
   }, []);
@@ -496,7 +511,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   const focusUnregister = useCallback((focusId: string) => {
     const path = _currentPath;
     if (path.length === 0) return;
-    const owner = path[path.length - 1];
+    const owner = _currentOverlayComponent || path[path.length - 1];
     const layer = layersRef.current.get(owner);
     if (!layer) return;
 

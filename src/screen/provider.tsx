@@ -291,7 +291,7 @@ function screenReducer(state: ScreenState, action: ScreenAction): ScreenState {
           component: action.component,
           params: mergedParams,
         },
-        counter: state.counter + 1,
+        counter: state.counter,
       };
     }
 
@@ -299,7 +299,7 @@ function screenReducer(state: ScreenState, action: ScreenAction): ScreenState {
       return {
         ...state,
         overlay: null,
-        counter: state.counter + 1,
+        counter: state.counter,
       };
     }
 
