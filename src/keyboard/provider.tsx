@@ -84,7 +84,7 @@ function normalizeKeyNames(input: string, key: Key): string[] {
 *
 * TODO: Finish the implementation of TextInput as soon as possible
 */
-function isNormalCharacter(input: string, key: Key): boolean {
+function _isNormalCharacter(input: string, key: Key): boolean {
     // 必须有实际字符内容
     if (!input) return false;
 
