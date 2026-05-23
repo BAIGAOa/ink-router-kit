@@ -47,8 +47,9 @@ function renderWithCursor(
 
   let result = '';
   for (let i = 0; i < displayValue.length; i++) {
-    const isInHighlight =
-      i >= cursorOffset - actualHighlightWidth && i <= cursorOffset;
+    const isInHighlight = highlightPastedText
+      ? i >= cursorOffset - actualHighlightWidth && i < cursorOffset
+      : i >= cursorOffset - actualHighlightWidth && i <= cursorOffset;
     result += isInHighlight ? chalk.inverse(displayValue[i]) : displayValue[i];
   }
 
@@ -127,19 +128,29 @@ export function TextInput({
   /**
    * 插入文本或删除字符
    * @param insertion 要插入的字符串，undefined 表示执行删除操作
+   * @param isForwardDelete true 表示 Delete（删光标右侧），false/undefined 表示 Backspace（删光标左侧）
    */
   const modifyText = useCallback(
-    (insertion?: string) => {
+    (insertion?: string, isForwardDelete = false) => {
       let newValue = originalValue;
       let newOffset = cursorOffset;
 
       if (insertion === undefined) {
-        // 删除（退格）
-        if (cursorOffset > 0) {
+        // 删除操作
+        if (isForwardDelete && cursorOffset < originalValue.length) {
+          // Delete：删除光标右侧一个字符
+          newValue =
+            originalValue.slice(0, cursorOffset) +
+            originalValue.slice(cursorOffset + 1);
+          // 光标位置不变
+        } else if (!isForwardDelete && cursorOffset > 0) {
+          // Backspace：删除光标左侧一个字符
           newValue =
             originalValue.slice(0, cursorOffset - 1) +
             originalValue.slice(cursorOffset);
           newOffset = cursorOffset - 1;
+        } else {
+          return;
         }
       } else {
         // 插入
@@ -179,7 +190,10 @@ export function TextInput({
 
     // 退格 / 删除
     unbindList.push(
-      boundKeyboard(['backspace', 'delete'], () => modifyText(), { focusId: fid }),
+      boundKeyboard(['backspace'], () => modifyText(), { focusId: fid }),
+    );
+    unbindList.push(
+      boundKeyboard(['delete'], () => modifyText(undefined, true), { focusId: fid }),
     );
 
     // 回车提交
