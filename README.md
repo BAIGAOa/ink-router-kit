@@ -82,7 +82,7 @@ Every API provides full TypeScript type inference. Functions like `skip`, `gotoS
 ---
 ## Documentation for the components
 
--**[SelectInput](src/components/select/README.md)** — Build your form from the comfort of your terminal
+- **[SelectInput](src/components/select/README.md)** — Build your form from the comfort of your terminal
 
 ---
 
