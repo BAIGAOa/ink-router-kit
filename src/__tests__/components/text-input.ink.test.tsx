@@ -649,10 +649,7 @@ describe('placeholder 边界', () => {
     expect(lastFrameClean()).toContain('>');
   });
 });;
-    expect(output).toContain('hi');
-    expect(output).not.toContain('hello');
-  });
-});
+  
 
 
 describe('UncontrolledTextInput', () => {
