@@ -9,6 +9,7 @@ import { KeyboardProvider } from '../../keyboard/provider.js';
 import { useKeyboard } from '../../keyboard/hook.js';
 import { TextInput, UncontrolledTextInput } from '../../components/text/TextInput.js';
 
+
 // ── 按键常量 ─────────────────────────────────────────────
 // 通过 stdin.write() 写入终端转义序列来模拟按键。
 // Ink v7 的 useInput 正确解析以下序列并设置 key 标志位：
