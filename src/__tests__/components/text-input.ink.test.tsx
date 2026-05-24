@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render } from 'ink-testing-library';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import { registerComponent, clearRegistry } from '../../screen/registry.js';
 import { ScenarioManagementProvider } from '../../screen/provider.js';
@@ -22,7 +22,7 @@ const KEYS = {
   enter:     '\r',
   escape:    '\x1b',
   backspace: '\x7f',
-  tab:       '\t',            // 仅作为普通字符，不触发 key.tab
+  tab:       '\t',
   up:        '\x1b[A',
   down:      '\x1b[B',
   right:     '\x1b[C',
@@ -497,12 +497,10 @@ describe('焦点隔离', () => {
       ),
     );
 
-    // input-a 先注册 → 默认聚焦
     await press(stdin, 'a');
     expect(onChangeA).toHaveBeenCalledWith('a');
     expect(onChangeB).not.toHaveBeenCalled();
 
-    // 程序式切换到 input-b
     kbRef.current!.focusSet('input-b');
 
     onChangeA.mockClear();
@@ -558,7 +556,6 @@ describe('焦点隔离', () => {
     expect(onChangeB).toHaveBeenCalledWith('x');
     expect(onChangeA).not.toHaveBeenCalled();
 
-    // 再切回
     kbRef.current!.focusNext();
     expect(kbRef.current!.focusCurrent()).toBe('input-a');
 
@@ -612,7 +609,7 @@ describe('特殊键不泄漏到通配符', () => {
 
   it('\\t 在 Ink v7 被视为普通字符插入（记录行为，防止回归时静默变化）', async () => {
     const onChange = vi.fn();
-    const { stdin, lastFrameClean } = renderTextInput({
+    const { stdin } = renderTextInput({
       focusId: 'inp',
       value: '',
       onChange,
@@ -620,168 +617,7 @@ describe('特殊键不泄漏到通配符', () => {
 
     await press(stdin, KEYS.tab);
 
-    // Ink v7 将 \t 作为普通字符插入
     expect(onChange).toHaveBeenCalledWith('\t');
-  });
-});
-
-
-describe('placeholder 边界', () => {
-  it('空字符串 placeholder 且 value 为空时不抛错', () => {
-    const { lastFrameClean } = renderTextInput({
-      focusId: 'inp',
-      value: '',
-      onChange: () => {},
-      placeholder: '',
-    });
-
-    expect(() => lastFrameClean()).not.toThrow();
-  });
-
-  it('placeholder 为单字符时正常工作', () => {
-    const { lastFrameClean } = renderTextInput({
-      focusId: 'inp',
-      value: '',
-      onChange: () => {},
-      placeholder: '>',
-    });
-
-    expect(lastFrameClean()).toContain('>');
-  });
-});;
-  
-
-
-describe('UncontrolledTextInput', () => {
-  it('initialValue 作为初始渲染值', () => {
-    const { lastFrameClean } = renderUncontrolled({
-      focusId: 'inp',
-      initialValue: 'default',
-    });
-    expect(lastFrameClean()).toContain('default');
-  });
-
-  it('输入后自动更新渲染', async () => {
-    const { lastFrameClean, stdin } = renderUncontrolled({
-      focusId: 'inp',
-      initialValue: '',
-    });
-
-    await type(stdin, 'XY');
-    expect(lastFrameClean()).toContain('XY');
-  });
-
-  it('退格后渲染更新', async () => {
-    const { lastFrameClean, stdin } = renderUncontrolled({
-      focusId: 'inp',
-      initialValue: 'abc',
-    });
-
-    await press(stdin, KEYS.backspace);
-    expect(lastFrameClean()).toContain('ab');
-  });
-
-  it('onSubmit 传递当前值', async () => {
-    const onSubmit = vi.fn();
-    const { stdin } = renderUncontrolled({
-      focusId: 'inp',
-      initialValue: 'submit-me',
-      onSubmit,
-    });
-
-    await press(stdin, KEYS.enter);
-    expect(onSubmit).toHaveBeenCalledWith('submit-me');
-  });
-});
-
-
-describe('焦点隔离', () => {
-  it('两个 TextInput 不同 focusId，Tab 切换后按键仅影响当前聚焦的', async () => {
-    const onChangeA = vi.fn();
-    const onChangeB = vi.fn();
-
-    function HostScreen() {
-      return React.createElement(
-        'ink-virtual',
-        null,
-        React.createElement(TextInput, {
-          focusId: 'input-a',
-          value: '',
-          onChange: onChangeA,
-        }),
-        React.createElement(TextInput, {
-          focusId: 'input-b',
-          value: '',
-          onChange: onChangeB,
-        }),
-      );
-    }
-    HostScreen.displayName = 'DualHost';
-
-    clearRegistry();
-    registerComponent(HostScreen, {});
-
-    const { stdin } = render(
-      React.createElement(
-        ScenarioManagementProvider,
-        { defaultScreen: HostScreen },
-        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
-      ),
-    );
-
-    // input-a 先注册 → 默认聚焦
-    await press(stdin, 'a');
-    expect(onChangeA).toHaveBeenCalledWith('a');
-    expect(onChangeB).not.toHaveBeenCalled();
-
-    // Tab 切换到 input-b
-    await press(stdin, KEYS.tab);
-
-    onChangeA.mockClear();
-    onChangeB.mockClear();
-
-    await press(stdin, 'b');
-    expect(onChangeB).toHaveBeenCalledWith('b');
-    expect(onChangeA).not.toHaveBeenCalled();
-  });
-});
-
-
-
-describe('特殊键不泄漏到通配符', () => {
-  it('escape / tab / arrow 不触发 onChange', async () => {
-    const onChange = vi.fn();
-    const { stdin } = renderTextInput({
-      focusId: 'inp',
-      value: 'test',
-      onChange,
-    });
-
-    onChange.mockClear();
-
-    await press(stdin, KEYS.escape);
-    await press(stdin, KEYS.tab);
-    await press(stdin, KEYS.up);
-    await press(stdin, KEYS.down);
-
-    // 通配符 '*' 不应捕获这些特殊键
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it('ctrl+字符不触发 onChange', async () => {
-    // Ctrl+S 的 ASCII 码是 0x13。Ink 的输入层会将其解析为 ctrl+s。
-    // 验证 isNormalCharacter 正确排除了 ctrl 修饰键。
-    const onChange = vi.fn();
-    const { stdin } = renderTextInput({
-      focusId: 'inp',
-      value: '',
-      onChange,
-    });
-
-    stdin.write('\x13');
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(onChange).not.toHaveBeenCalled();
   });
 });
 
