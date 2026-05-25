@@ -860,11 +860,12 @@ describe('组件卸载清理', () => {
 
 describe('非聚焦渲染（isFocused=false）', () => {
   it('未获焦的 SelectInput 不显示 ▶ 指示器', async () => {
-    const { lastFrameClean, kbRef } = renderDualSelectInput({
+    const { lastFrameClean, kbRef, stdin } = renderDualSelectInput({
       items: threeItems,
     });
 
-    await flush();
+    // 按键确认 effects 已跑完
+    await press(stdin, KEYS.down);
 
     const output = lastFrameClean();
     const count = (output.match(/\u276F/g) || []).length;
@@ -872,7 +873,8 @@ describe('非聚焦渲染（isFocused=false）', () => {
 
     kbRef.current!.focusSet('select-b');
 
-    await flush();
+    // 按键确认重渲染完成
+    await press(stdin, KEYS.down);
 
     const output2 = lastFrameClean();
     const count2 = (output2.match(/\u276F/g) || []).length;
@@ -880,11 +882,12 @@ describe('非聚焦渲染（isFocused=false）', () => {
   });
 
   it('焦点切换后，新获焦组件显示 ▶，原组件不再显示 ▶', async () => {
-    const { lastFrameClean, kbRef } = renderDualSelectInput({
+    const { lastFrameClean, kbRef, stdin } = renderDualSelectInput({
       items: threeItems,
     });
 
-    await flush();
+    // 按键确认 effects 已跑完
+    await press(stdin, KEYS.down);
 
     const before = lastFrameClean();
     const beforeCount = (before.match(/\u276F/g) || []).length;
@@ -892,7 +895,8 @@ describe('非聚焦渲染（isFocused=false）', () => {
 
     kbRef.current!.focusSet('select-b');
 
-    await flush();
+    // 按键确认重渲染完成
+    await press(stdin, KEYS.down);
 
     const after = lastFrameClean();
     const afterCount = (after.match(/\u276F/g) || []).length;
