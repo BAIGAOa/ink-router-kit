@@ -594,6 +594,21 @@ describe('自定义渲染', () => {
     expect(output).not.toContain('\u276F');
   });
 
+  it('自定义 item 渲染成功，选中项与未选中项样式不同', async () => {
+    const { lastFrameClean } = renderSelectInput({
+      focusId: 'test',
+      items: threeItems,
+      itemComponent: CustomItem,
+    });
+
+    await flush();
+
+    const output = lastFrameClean();
+    // 第 0 项选中 → [>]
+    expect(output).toContain('[>]');
+    // 其他项未选中 → [ ]
+    expect(output).toContain('[ ]');
+  });
 
   it('自定义 indicator + item 同时生效', async () => {
     const { lastFrameClean } = renderSelectInput({
@@ -609,20 +624,6 @@ describe('自定义渲染', () => {
     expect(output).toContain('*');
     expect(output).toContain('[>]');
     expect(output).not.toContain('\u276F');
-  });
-
-  it('选中项与未选中项样式不同', async () => {
-    const { lastFrameClean } = renderSelectInput({
-      focusId: 'test',
-      items: threeItems,
-      itemComponent: CustomItem,
-    });
-
-    await flush();
-
-    const output = lastFrameClean();
-    expect(output).toContain('[>]');
-    expect(output).toContain('[ ]');
   });
 });
 
