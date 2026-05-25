@@ -595,30 +595,32 @@ describe('自定义渲染', () => {
   });
 
   it('自定义 item 渲染成功，选中项与未选中项样式不同', async () => {
-    const { lastFrameClean } = renderSelectInput({
+    const { lastFrameClean, stdin } = renderSelectInput({
       focusId: 'test',
       items: threeItems,
       itemComponent: CustomItem,
     });
 
-    await flush();
+    // 按键确认 effects 已跑完并且焦点已注册
+    await press(stdin, KEYS.down);
 
     const output = lastFrameClean();
-    // 第 0 项选中 → [>]
+    // 按 ↓ 后第二项选中 → [>]
     expect(output).toContain('[>]');
-    // 其他项未选中 → [ ]
+    // 其余未选中 → [ ]
     expect(output).toContain('[ ]');
   });
 
   it('自定义 indicator + item 同时生效', async () => {
-    const { lastFrameClean } = renderSelectInput({
+    const { lastFrameClean, stdin } = renderSelectInput({
       focusId: 'test',
       items: threeItems,
       indicatorComponent: StarIndicator,
       itemComponent: CustomItem,
     });
 
-    await flush();
+    // 按键确认 effects 已跑完并且焦点已注册
+    await press(stdin, KEYS.down);
 
     const output = lastFrameClean();
     expect(output).toContain('*');
