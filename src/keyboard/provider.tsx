@@ -35,6 +35,9 @@ let _focusSubscribers = new Set<() => void>();
 // 以及为了可以JSON配置化，我们就需要这个东西
 let _shortcutOperations = new Map<string, () => void>()
 
+export function clearShortcutOperations(){
+  _shortcutOperations.clear()
+}
 
 /**
  * Convert an Ink `(input, key)` event into a list of possible key-name
