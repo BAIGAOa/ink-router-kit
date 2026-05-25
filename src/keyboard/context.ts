@@ -128,6 +128,17 @@ export interface KeyboardContextValue {
    */
   subscribeFocus: (listener: () => void) => () => void;
 
+	/**
+	 * Register named shortcut actions that can be referenced by key bindings
+	 * using a string identifier instead of an inline callback.
+	 *
+	 * Decouples operation definition from key binding.
+	 *
+	 * @param entries - Array of shortcut operation definitions.
+ 	 *                  Each entry must have a unique `actionId`.
+	 *
+	 * @throws {Error} If an `actionId` is duplicated.
+	 	*/
   defineShortcutAction: (entries: ShortcutOperationEntry[]) => void;
 }
 
