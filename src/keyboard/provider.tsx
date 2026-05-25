@@ -261,7 +261,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       const path = _currentPath;
       if (path.length === 0) {
         throw new Error(
-          '[Ink-Trc] boundKeyboard() 必须在屏幕组件内调用。当前无活跃屏幕。',
+          '[Ink-Router-Kit] bound Keyboard () must be called inside the screen component. There is currently no active screen.',
         );
       }
       const owner = _currentOverlayComponent || path[path.length - 1];
@@ -300,10 +300,10 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           const cover = gk.cover ?? true;
           if (!cover) {
             throw new Error(
-              `[Ink-Trc] 组件 "${owner.displayName || owner.name || 'anonymous'}" ` +
-              `通过 focusId="${fid}" 尝试绑定了 "${matchingKeys[0]}"，` +
-              `但该键已被 globalKeys 声明且 cover: false，不允许覆盖。`,
-            );
+              `[Ink-Router-Kit] Component "${owner.displayName || owner.name || 'anonymous'}" ` +
+              `attempted to bind "${matchingKeys[0]}" via focusId="${fid}", ` +
+              `but this key is already declared in globalKeys with cover: false, so overriding is not allowed.`,
+            )
           }
 
           for (const k of matchingKeys) {
@@ -376,7 +376,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         const cover = gk.cover ?? true;
         if (!cover) {
           throw new Error(
-            `[Ink-Trc] 组件 "${owner.displayName || owner.name || 'anonymous'}" 尝试通过 boundKeyboard 绑定 "${matchingKeys[0]}"，但该键已被 globalKeys 声明且 cover: false，不允许覆盖。`,
+            `[Ink-Router-Kit] Component "${owner.displayName || owner.name || 'anonymous'}" attempted to bind "${matchingKeys[0]}" via boundKeyboard, but this key has already been declared by globalKeys with cover: false, disallowing overwriting.`
           );
         }
 
@@ -486,7 +486,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     (keys: string[], options?: StopOptions): (() => void) => {
       const path = _currentPath;
       if (path.length === 0) {
-        throw new Error('[Ink-Trc] stop() 必须在屏幕组件内调用。');
+        throw new Error('[Ink-Trc] stop() must be called within a screen component.');
       }
       const owner = _currentOverlayComponent || path[path.length - 1];
       const layer = getLayer(owner);
