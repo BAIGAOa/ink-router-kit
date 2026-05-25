@@ -11,14 +11,6 @@ import { useScreenSystem } from '../../screen/hook.js';
 import { SelectInput } from '../../components/select/SelectInput.js';
 import type { Item } from '../../components/select/types.js';
 
-// ── 按键常量 ─────────────────────────────────────────────
-// Ink v7 的 useInput 正确解析以下 ANSI 转义序列：
-//   \r → return
-//   \x1b → escape
-//   \x1b[A → up    \x1b[B → down
-//   \x1b[C → right \x1b[D → left
-// 注意：\t 在 Ink v7 不被解析为 key.tab=true，Tab 焦点切换
-// 不能通过 stdin.write('\t') 驱动，见"焦点系统"套件。
 const KEYS = {
   enter: '\r',
   escape: '\x1b',
@@ -27,8 +19,6 @@ const KEYS = {
   right: '\x1b[C',
   left: '\x1b[D',
 } as const;
-
-// ── 辅助函数 ─────────────────────────────────────────────
 
 function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, '');
@@ -42,7 +32,10 @@ async function press(
   await new Promise((r) => setTimeout(r, 10));
 }
 
-// ── 测试数据 ─────────────────────────────────────────────
+/** 等待 React effects 刷完（focus 注册等） */
+async function flush() {
+  await new Promise((r) => setTimeout(r, 10));
+}
 
 const threeItems: Item<string>[] = [
   { label: 'Dark', value: 'dark' },
@@ -54,8 +47,6 @@ const longItems: Item<string>[] = Array.from({ length: 15 }, (_, i) => ({
   label: `Item ${String(i + 1).padStart(2, '0')}`,
   value: `v${String(i + 1).padStart(2, '0')}`,
 }));
-
-// ── Render 辅助：单 SelectInput ──────────────────────────
 
 function renderSelectInput(props: {
   focusId: string;
@@ -100,8 +91,6 @@ function renderSelectInput(props: {
     onSelect,
   };
 }
-
-// ── Render 辅助：双 SelectInput（焦点测试用）─────────────
 
 function renderDualSelectInput(props: { items: Item<string>[] }) {
   const onSelectA = vi.fn();
@@ -155,20 +144,12 @@ function renderDualSelectInput(props: { items: Item<string>[] }) {
   };
 }
 
-// ── Render 辅助：可导航屏幕树（卸载测试用）───────────────
-
 function renderNavigableSelectInput(items: Item<string>[]) {
   const onSelect = vi.fn();
-  const screenRef: { current: ReturnType<typeof useScreenSystem> | null } = {
-    current: null,
-  };
 
   function Menu() {
     const sc = useScreenSystem();
     const { boundKeyboard } = useKeyboard();
-    useEffect(() => {
-      screenRef.current = sc;
-    });
     useEffect(() => {
       boundKeyboard(['s'], () => sc.skip(Settings, {}));
     }, []);
@@ -210,11 +191,8 @@ function renderNavigableSelectInput(items: Item<string>[]) {
     stdin,
     unmount,
     onSelect,
-    screenRef,
   };
 }
-
-// ── Cleanup ───────────────────────────────────────────────
 
 beforeEach(() => {
   clearRegistry();
@@ -241,25 +219,27 @@ describe('基础渲染', () => {
     expect(output).toContain('Cyberpunk');
   });
 
-  it('聚焦时，选中项（第 0 项）显示 ▶ 指示器', () => {
+  it('聚焦时，选中项（第 0 项）显示 ▶ 指示器', async () => {
     const { lastFrameClean } = renderSelectInput({
       focusId: 'test',
       items: threeItems,
     });
 
+    await flush();
+
     const output = lastFrameClean();
-    // ▶ 是 \u276F，选中项前面会有 ▶
     expect(output).toContain('\u276F');
   });
 
-  it('非选中项不显示 ▶，而是空格占位', () => {
+  it('非选中项不显示 ▶，而是空格占位', async () => {
     const { lastFrameClean } = renderSelectInput({
       focusId: 'test',
       items: threeItems,
     });
 
+    await flush();
+
     const output = lastFrameClean();
-    // ▶ 只出现一次（只有当前选中项有）
     const count = (output.match(/\u276F/g) || []).length;
     expect(count).toBe(1);
   });
@@ -293,7 +273,6 @@ describe('键盘导航', () => {
       onSelect,
     });
 
-    // 先向下两次，再向上一次
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.up);
@@ -310,7 +289,6 @@ describe('键盘导航', () => {
       onSelect,
     });
 
-    // 在顶部连按多次 ↑
     await press(stdin, KEYS.up);
     await press(stdin, KEYS.up);
     await press(stdin, KEYS.up);
@@ -327,10 +305,8 @@ describe('键盘导航', () => {
       onSelect,
     });
 
-    // 先移到最底部
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.down);
-    // 再尝试多按几次 ↓
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.enter);
@@ -437,7 +413,6 @@ describe('数字快捷键', () => {
       onSelect,
     });
 
-    // 只有 3 个可见项，按 4 不应触发
     await press(stdin, '4');
     expect(onSelect).not.toHaveBeenCalled();
   });
@@ -448,17 +423,17 @@ describe('数字快捷键', () => {
 // ═══════════════════════════════════════════════════════════
 
 describe('滚动（items > limit）', () => {
-  it('items 超过默认 limit=10 时，只渲染最多 10 项', () => {
+  it('items 超过默认 limit=10 时，只渲染最多 10 项', async () => {
     const { lastFrameClean } = renderSelectInput({
       focusId: 'test',
       items: longItems,
     });
 
+    await flush();
+
     const output = lastFrameClean();
-    // Item 01 ~ Item 10 应该在输出中
     expect(output).toContain('Item 01');
     expect(output).toContain('Item 10');
-    // Item 11 ~ Item 15 不应该在输出中
     expect(output).not.toContain('Item 11');
     expect(output).not.toContain('Item 15');
   });
@@ -469,18 +444,13 @@ describe('滚动（items > limit）', () => {
       items: longItems,
     });
 
-    // 从第 0 项按 ↓ 共 10 次 → 高亮到第 10 项（索引 10）
-    // 此时 scrollOffset 应为 1，可见窗口 [Item 02 .. Item 11]
     for (let i = 0; i < 10; i++) {
       await press(stdin, KEYS.down);
     }
 
     const output = lastFrameClean();
-    // Item 01 应该已滚出窗口
     expect(output).not.toContain('Item 01');
-    // Item 11 应该已滚入窗口
     expect(output).toContain('Item 11');
-    // Item 02 和 Item 10 仍在
     expect(output).toContain('Item 02');
     expect(output).toContain('Item 10');
   });
@@ -491,19 +461,15 @@ describe('滚动（items > limit）', () => {
       items: longItems,
     });
 
-    // 先向下滚出
     for (let i = 0; i < 10; i++) {
       await press(stdin, KEYS.down);
     }
-    // 再向上滚回
     for (let i = 0; i < 10; i++) {
       await press(stdin, KEYS.up);
     }
 
     const output = lastFrameClean();
-    // Item 01 应该重新出现
     expect(output).toContain('Item 01');
-    // Item 11 应该已滚出
     expect(output).not.toContain('Item 11');
   });
 
@@ -515,16 +481,13 @@ describe('滚动（items > limit）', () => {
       onSelect,
     });
 
-    // 向下滚动 10 次，使 scrollOffset > 0
     for (let i = 0; i < 10; i++) {
       await press(stdin, KEYS.down);
     }
 
-    // 按 1 应选择当前窗口的第 1 项，即 items[scrollOffset]，不是 items[0]
     await press(stdin, '1');
 
     const calledWith = onSelect.mock.calls[0][0] as Item<string>;
-    // 被选择的不是 Item 01
     expect(calledWith).not.toEqual(longItems[0]);
   });
 
@@ -536,7 +499,6 @@ describe('滚动（items > limit）', () => {
       onSelect,
     });
 
-    // 向下移动 3 次
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.down);
@@ -551,8 +513,10 @@ describe('滚动（items > limit）', () => {
 // ═══════════════════════════════════════════════════════════
 
 describe('焦点系统', () => {
-  it('两个 SelectInput 中，第一个注册的自动获得焦点', () => {
+  it('两个 SelectInput 中，第一个注册的自动获得焦点', async () => {
     const { kbRef } = renderDualSelectInput({ items: threeItems });
+
+    await flush();
 
     expect(kbRef.current!.focusCurrent()).toBe('select-a');
   });
@@ -562,7 +526,6 @@ describe('焦点系统', () => {
       items: threeItems,
     });
 
-    // select-a 默认获焦，按 ↓ + Enter 应该触发 select-a
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.enter);
 
@@ -575,16 +538,12 @@ describe('焦点系统', () => {
       items: threeItems,
     });
 
-    // 切换到 select-b
     kbRef.current!.focusSet('select-b');
     expect(kbRef.current!.focusCurrent()).toBe('select-b');
 
-    // 现在按键应该到 select-b
     await press(stdin, KEYS.enter);
     expect(onSelectB).toHaveBeenCalledTimes(1);
     expect(onSelectA).not.toHaveBeenCalled();
-
-    // select-b 应该选中的是它的第 0 项
     expect(onSelectB).toHaveBeenCalledWith(threeItems[0]);
   });
 
@@ -593,15 +552,12 @@ describe('焦点系统', () => {
       items: threeItems,
     });
 
-    // select-a 先操作一次
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.enter);
     expect(onSelectA).toHaveBeenCalledWith(threeItems[1]);
 
-    // 切换焦点
     kbRef.current!.focusSet('select-b');
 
-    // select-a 的回调不应再被触发
     onSelectA.mockClear();
     onSelectB.mockClear();
     await press(stdin, KEYS.down);
@@ -615,13 +571,11 @@ describe('焦点系统', () => {
       items: threeItems,
     });
 
-    // select-a: 移到第 3 项选中
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.enter);
     expect(onSelectA).toHaveBeenCalledWith(threeItems[2]);
 
-    // 切换到 select-b: 第 0 项直接选中
     onSelectA.mockClear();
     kbRef.current!.focusSet('select-b');
     await press(stdin, KEYS.enter);
@@ -636,7 +590,7 @@ describe('焦点系统', () => {
 describe('自定义渲染', () => {
   const StarIndicator = ({ isSelected }: { isSelected: boolean }) => (
     <Box marginRight={1}>
-      {isSelected ? <Text color="yellow">★</Text> : <Text> </Text>}
+      {isSelected ? <Text color="yellow">*</Text> : <Text> </Text>}
     </Box>
   );
 
@@ -649,33 +603,34 @@ describe('自定义渲染', () => {
     </Text>
   );
 
-  it('自定义 indicator 渲染成功', () => {
+  it('自定义 indicator 渲染成功', async () => {
     const { lastFrameClean } = renderSelectInput({
       focusId: 'test',
       items: threeItems,
       indicatorComponent: StarIndicator,
     });
 
+    await flush();
+
     const output = lastFrameClean();
-    // ★ 是自定义 indicator 的选中态
-    expect(output).toContain('★');
-    // ▶ 是默认 indicator，不应该出现
+    expect(output).toContain('*');
     expect(output).not.toContain('\u276F');
   });
 
-  it('自定义 item 渲染成功', () => {
+  it('自定义 item 渲染成功', async () => {
     const { lastFrameClean } = renderSelectInput({
       focusId: 'test',
       items: threeItems,
       itemComponent: CustomItem,
     });
 
+    await flush();
+
     const output = lastFrameClean();
-    // 选中项显示 [>]
     expect(output).toContain('[>]');
   });
 
-  it('自定义 indicator + item 同时生效', () => {
+  it('自定义 indicator + item 同时生效', async () => {
     const { lastFrameClean } = renderSelectInput({
       focusId: 'test',
       items: threeItems,
@@ -683,22 +638,24 @@ describe('自定义渲染', () => {
       itemComponent: CustomItem,
     });
 
+    await flush();
+
     const output = lastFrameClean();
-    expect(output).toContain('★');
+    expect(output).toContain('*');
     expect(output).toContain('[>]');
     expect(output).not.toContain('\u276F');
   });
 
-  it('选中项与未选中项样式不同', () => {
+  it('选中项与未选中项样式不同', async () => {
     const { lastFrameClean } = renderSelectInput({
       focusId: 'test',
       items: threeItems,
       itemComponent: CustomItem,
     });
 
+    await flush();
+
     const output = lastFrameClean();
-    // 第 0 项选中：[>] Dark
-    // 第 1 项未选中：[ ] Light
     expect(output).toContain('[>]');
     expect(output).toContain('[ ]');
   });
@@ -711,10 +668,7 @@ describe('自定义渲染', () => {
 describe('空列表', () => {
   it('items=[] 时不抛错且正常渲染', () => {
     expect(() => {
-      renderSelectInput({
-        focusId: 'test',
-        items: [],
-      });
+      renderSelectInput({ focusId: 'test', items: [] });
     }).not.toThrow();
   });
 
@@ -729,8 +683,6 @@ describe('空列表', () => {
     await expect(press(stdin, KEYS.down)).resolves.not.toThrow();
     await expect(press(stdin, KEYS.up)).resolves.not.toThrow();
     await expect(press(stdin, KEYS.enter)).resolves.not.toThrow();
-
-    // onSelect 不应被调用
     expect(onSelect).not.toHaveBeenCalled();
   });
 
@@ -752,12 +704,14 @@ describe('空列表', () => {
 // ═══════════════════════════════════════════════════════════
 
 describe('limit 自定义值', () => {
-  it('limit=3 时只显示 3 项', () => {
+  it('limit=3 时只显示 3 项', async () => {
     const { lastFrameClean } = renderSelectInput({
       focusId: 'test',
       items: longItems,
       limit: 3,
     });
+
+    await flush();
 
     const output = lastFrameClean();
     expect(output).toContain('Item 01');
@@ -790,15 +744,12 @@ describe('limit 自定义值', () => {
       limit: 3,
     });
 
-    // 按 ↓ 3 次，高亮移到索引 3，触发滚动 offset=1
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.down);
 
     const output = lastFrameClean();
-    // Item 01 应该已滚出
     expect(output).not.toContain('Item 01');
-    // Item 04 应该已滚入
     expect(output).toContain('Item 04');
   });
 });
@@ -814,7 +765,6 @@ describe('items 动态变化', () => {
     function HostScreen() {
       const [items, _setItems] = useState(threeItems);
       setItems = _setItems;
-
       return (
         <SelectInput focusId="test" items={items} onSelect={vi.fn()} />
       );
@@ -832,15 +782,12 @@ describe('items 动态变化', () => {
       </ScenarioManagementProvider>,
     );
 
-    // 先向下移动到第 3 项
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.down);
 
-    // 收缩 items 到只有 1 项
     expect(() => setItems([{ label: 'Only', value: 'only' }])).not.toThrow();
 
-    // 等待渲染
-    await new Promise((r) => setTimeout(r, 10));
+    await flush();
 
     const output = stripAnsi(lastFrame());
     expect(output).toContain('Only');
@@ -857,7 +804,6 @@ describe('items 动态变化', () => {
     function HostScreen() {
       const [items, _setItems] = useState(initialItems);
       setItems = _setItems;
-
       return (
         <SelectInput focusId="test" items={items} onSelect={vi.fn()} />
       );
@@ -867,7 +813,7 @@ describe('items 动态变化', () => {
     clearRegistry();
     registerComponent(HostScreen, {});
 
-    const { lastFrame } = render(
+    const { lastFrame, stdin } = render(
       <ScenarioManagementProvider defaultScreen={HostScreen}>
         <KeyboardProvider>
           <CurrentScreen />
@@ -875,13 +821,17 @@ describe('items 动态变化', () => {
       </ScenarioManagementProvider>,
     );
 
+    // 等 effect 跑完、focus 注册
+    await flush();
+
     setItems([
       { label: 'A', value: 'a' },
       { label: 'B', value: 'b' },
       { label: 'C', value: 'c' },
     ]);
 
-    await new Promise((r) => setTimeout(r, 10));
+    // 发送一个按键确保渲染周期完成
+    await press(stdin, KEYS.down);
 
     const output = stripAnsi(lastFrame());
     expect(output).toContain('A');
@@ -899,25 +849,20 @@ describe('组件卸载清理', () => {
     const { stdin, onSelect, lastFrameClean } =
       renderNavigableSelectInput(threeItems);
 
-    // 初始在 Menu
     expect(lastFrameClean()).toContain('Menu');
 
-    // 按 S 导航到 Settings（含 SelectInput）
     await press(stdin, 's');
     expect(lastFrameClean()).toContain('Dark');
 
-    // SelectInput 正常工作
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.enter);
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledWith(threeItems[1]);
 
-    // 按 B 返回 Menu（SelectInput 被卸载）
     onSelect.mockClear();
     await press(stdin, 'b');
     expect(lastFrameClean()).toContain('Menu');
 
-    // 现在按方向键不应该触发已卸载的 SelectInput
     await press(stdin, KEYS.down);
     await press(stdin, KEYS.up);
     await press(stdin, KEYS.enter);
@@ -928,19 +873,14 @@ describe('组件卸载清理', () => {
     const { stdin, onSelect, lastFrameClean } =
       renderNavigableSelectInput(threeItems);
 
-    // 进入 Settings
     await press(stdin, 's');
-    // 操作一次
     await press(stdin, KEYS.enter);
     expect(onSelect).toHaveBeenCalledWith(threeItems[0]);
 
-    // 返回 Menu
     await press(stdin, 'b');
-    // 再进入 Settings
     await press(stdin, 's');
 
     onSelect.mockClear();
-    // 重新进入后选中应重置为第 0 项
     await press(stdin, KEYS.enter);
     expect(onSelect).toHaveBeenCalledWith(threeItems[0]);
   });
@@ -951,36 +891,40 @@ describe('组件卸载清理', () => {
 // ═══════════════════════════════════════════════════════════
 
 describe('非聚焦渲染（isFocused=false）', () => {
-  it('未获焦的 SelectInput 不显示 ▶ 指示器', () => {
+  it('未获焦的 SelectInput 不显示 ▶ 指示器', async () => {
     const { lastFrameClean, kbRef } = renderDualSelectInput({
       items: threeItems,
     });
 
-    // select-a 获焦，select-b 未获焦
-    // 整个输出中应该只有 select-a 的选中项有 ▶
+    await flush();
+
     const output = lastFrameClean();
     const count = (output.match(/\u276F/g) || []).length;
     expect(count).toBe(1);
 
-    // 切换焦点后，▶ 转移到 select-b
     kbRef.current!.focusSet('select-b');
+
+    await flush();
+
     const output2 = lastFrameClean();
     const count2 = (output2.match(/\u276F/g) || []).length;
     expect(count2).toBe(1);
   });
 
-  it('焦点切换后，新获焦组件显示 ▶，原组件不再显示 ▶', () => {
+  it('焦点切换后，新获焦组件显示 ▶，原组件不再显示 ▶', async () => {
     const { lastFrameClean, kbRef } = renderDualSelectInput({
       items: threeItems,
     });
 
-    // 初始只有 select-a 有 ▶
+    await flush();
+
     const before = lastFrameClean();
     const beforeCount = (before.match(/\u276F/g) || []).length;
     expect(beforeCount).toBe(1);
 
-    // 切换焦点
     kbRef.current!.focusSet('select-b');
+
+    await flush();
 
     const after = lastFrameClean();
     const afterCount = (after.match(/\u276F/g) || []).length;
