@@ -249,6 +249,34 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     [],
   );
 
+  function tryMatchBindings(
+    bindings: BoundKeyEntry[],
+    unblockedKeys: string[],
+    input: string,
+    key: Key,
+    skipBinding?: (binding: BoundKeyEntry) => boolean,
+  ): boolean {
+    if (unblockedKeys.length === 0) return false;
+
+    for (const binding of bindings) {
+      if (skipBinding && skipBinding(binding)) continue;
+      if (binding.keys.some((k) => unblockedKeys.includes(k))) {
+        binding.handler(input, key);
+        return true;
+      }
+    }
+
+    const wildcardBinding = bindings.find(b => b.keys.includes('*'));
+    if (wildcardBinding && isNormalCharacter(input, key)) {
+      if (!skipBinding || !skipBinding(wildcardBinding)) {
+        wildcardBinding.handler(input, key);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   function handleTabNavigation(
     layer: ScreenKeyboardLayer,
     eventNames: string[],
@@ -679,20 +707,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
             const fBlocked = ft.blockedKeys;
             const fUnblocked = unblocked.filter((n) => !fBlocked.includes(n));
 
-            if (fUnblocked.length > 0) {
-              for (const binding of ft.bindings) {
-                if (binding.keys.some((k) => fUnblocked.includes(k))) {
-                  binding.handler(input, key);
-                  return;
-                }
-              }
-
-              const wildcardBinding = ft.bindings.find(b => b.keys.includes('*'));
-              if (wildcardBinding && isNormalCharacter(input, key)) {
-                wildcardBinding.handler(input, key);
-                return;
-              }
-            }
+            if (tryMatchBindings(ft.bindings, fUnblocked, input, key)) return;
 
             if (eventNames.some((n) => ft.stoppedKeys.includes(n))) {
               return;
@@ -700,21 +715,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           }
         }
 
-
-        if (unblocked.length > 0) {
-          for (const binding of overlayLayer.bindings) {
-            if (binding.keys.some((k) => unblocked.includes(k))) {
-              binding.handler(input, key);
-              return;
-            }
-          }
-
-          const wildcardBinding = overlayLayer.bindings.find(b => b.keys.includes('*'));
-          if (wildcardBinding && isNormalCharacter(input, key)) {
-            wildcardBinding.handler(input, key);
-            return;
-          }
-        }
+        if (tryMatchBindings(overlayLayer.bindings, unblocked, input, key)) return;
 
         if (eventNames.some((n) => overlayLayer.stoppedKeys.includes(n))) {
           return;
@@ -749,28 +750,8 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           const fBlocked = ft.blockedKeys;
           const fUnblocked = unblocked.filter((n) => !fBlocked.includes(n));
 
-          if (fUnblocked.length > 0) {
-            for (const binding of ft.bindings) {
-              if (
-                binding.onlyThis &&
-                _currentOverlayComponent !== null
-              )
-                continue;
-
-              if (binding.keys.some((k) => fUnblocked.includes(k))) {
-                binding.handler(input, key);
-                return;
-              }
-            }
-
-            const wildcardBinding = ft.bindings.find(b => b.keys.includes('*'));
-            if (wildcardBinding && isNormalCharacter(input, key)) {
-              if (!(wildcardBinding.onlyThis && overlayComp !== null)) {
-                wildcardBinding.handler(input, key);
-                return;
-              }
-            }
-          }
+          const skipOnlyThis = (b: BoundKeyEntry) => b.onlyThis && overlayComp !== null;
+          if (tryMatchBindings(ft.bindings, fUnblocked, input, key, skipOnlyThis)) return;
 
           if (eventNames.some((n) => ft.stoppedKeys.includes(n))) {
             return;
@@ -778,28 +759,9 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         }
       }
 
-      if (unblocked.length > 0) {
-        for (const binding of layer.bindings) {
-          if (
-            binding.onlyThis &&
-            (i !== path.length - 1 || _currentOverlayComponent !== null)
-          )
-            continue;
-
-          if (binding.keys.some((k) => unblocked.includes(k))) {
-            binding.handler(input, key);
-            return;
-          }
-        }
-
-        const wildcardBinding = layer.bindings.find(b => b.keys.includes('*'));
-        if (wildcardBinding && isNormalCharacter(input, key)) {
-          if (!(wildcardBinding.onlyThis && (i !== path.length - 1 || overlayComp !== null))) {
-            wildcardBinding.handler(input, key);
-            return;
-          }
-        }
-      }
+      const skipOnlyThis = (b: BoundKeyEntry) =>
+        b.onlyThis && (i !== path.length - 1 || overlayComp !== null);
+      if (tryMatchBindings(layer.bindings, unblocked, input, key, skipOnlyThis)) return;
 
       if (isTop && eventNames.some((n) => layer.stoppedKeys.includes(n))) {
         return;
