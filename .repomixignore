@@ -1,0 +1,10 @@
+src/__tests__/
+src/projectTest/
+
+LICENSE
+README.md
+src/screen/README.md
+src/keyboard/README.md
+
+src/components/select/README.md
+src/components/text/README.md

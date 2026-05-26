@@ -46,6 +46,10 @@ export { SelectInput } from "./components/select/SelectInput.js";
 export type { Item } from "./components/select/types.js";
 export type { SelectInputProps } from "./components/select/types.js";
 
+// Components — MultiSelectInput
+export { MultiSelectInput } from "./components/multi-select/MultiSelectInput.js";
+export type { MultiSelectInputProps } from "./components/multi-select/types.js";
+
 // Components — TextInput
 export { TextInput, UncontrolledTextInput } from "./components/text/TextInput.js";
 export type { TextInputProps, UncontrolledTextInputProps } from "./components/text/types.js";
