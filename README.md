@@ -93,6 +93,7 @@ Every API provides full TypeScript type inference. Functions like `skip`, `gotoS
 
 - **[SelectInput](src/components/select/README.md)** — Build your form from the comfort of your terminal
 - **[TextInput](src/components/text/README.md)** — Construct the input line in the terminal, and cooperate with the focus system and the keyboard system
+- **[MultiSelectInput](src/components/multi-select/README.md)** — Build a multi-select list and a task list in the terminal
 ---
 
 ## Quick Overview
