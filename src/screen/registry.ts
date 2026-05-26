@@ -31,7 +31,7 @@ export function registerComponent<C extends React.ComponentType<any>>(
 ): void {
   if (registry.has(component)) {
     throw new Error(
-      `[Ink-Trc] 组件 "${component.displayName || component.name || "anonymous"}" 已注册，不能重复注册。`,
+      `[Ink-Router-Kit] Component "${component.displayName || component.name || "anonymous"}" is already registered. Duplicate registration is not allowed.`,
     );
   }
 

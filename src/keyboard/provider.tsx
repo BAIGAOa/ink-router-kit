@@ -444,7 +444,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     (keys: string[], options?: BlockedKeyOptions) => {
       const path = _currentPath;
       if (path.length === 0) {
-        throw new Error('[Ink-Trc] blockedKey() 必须在屏幕组件内调用。');
+        throw new Error('[Ink-Router-Kit] blockedKey() must be called inside a screen component.');
       }
       const owner = _currentOverlayComponent || path[path.length - 1];
       const layer = getLayer(owner);

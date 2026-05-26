@@ -14,7 +14,7 @@ export function useKeyboard(): KeyboardContextValue {
   const ctx = useContext(KeyboardContext);
   if (!ctx) {
     throw new Error(
-      "[Ink-Trc] useKeyboard() 必须在 <KeyboardProvider> 内部使用。",
+      "[Ink-Router-Kit] useKeyboard() must be called inside a <KeyboardProvider>.",
     );
   }
   return ctx;

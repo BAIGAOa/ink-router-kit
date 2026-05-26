@@ -59,7 +59,7 @@ describe('registerComponent（基础）', () => {
 
   it('重复注册抛错', () => {
     registerComponent(Menu, {});
-    expect(() => registerComponent(Menu, {})).toThrow('已注册');
+    expect(() => registerComponent(Menu, {})).toThrow('is already registered');
   });
 
   it('多个组件可分别注册', () => {
