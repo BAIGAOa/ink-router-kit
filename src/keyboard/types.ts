@@ -56,22 +56,8 @@ export interface FocusTarget {
   blockedKeys: string[];
   /** Keys stopped on this target (propagation barrier). */
   stoppedKeys: string[];
-}
-
-/**
-* It is used to record the registered Actions of each layer for the convenience of subsequent function processing
-* For example, the Action masking function of the stop method needs to know which Keys of the historical Screen Level have registered which Actions.
-*/
-export interface ActionTarget{
-  /**
-  * Which corresponding Keys are registered for this action
-  * An Action may be registered with multiple keys, so it needs to be an array.
-  */
-  keys: string[];
-  /**
-  * .Corresponding Action
-  */
-  action: string;
+  /** Maps action IDs to the normalized keys that trigger them (for stopAction). */
+  actionKeysMap: Map<string, string[]>;
 }
 
 /**
@@ -94,8 +80,8 @@ export interface ScreenKeyboardLayer {
   focusOrder: string[];
   /** The currently active focus target id, or null. */
   currentFocusId: string | null;
-
-  actionTargets: ActionTarget[];
+  /** Maps action IDs to the normalized keys that trigger them (screen-level, excludes focus targets). */
+  actionKeysMap: Map<string, string[]>;
 }
 
 /**
@@ -105,6 +91,8 @@ export interface ScreenKeyboardLayer {
 export interface StopOptions {
   /** If provided, stops only within the named focus target. */
   focusId?: string;
+  /**Mask the Action mode, otherwise the stop method will treat the Action ID as a normal Key*/
+  stopAction?: boolean;
 }
 
 /**
