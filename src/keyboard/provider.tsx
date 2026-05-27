@@ -241,6 +241,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           focusTargets: new Map(),
           focusOrder: [],
           currentFocusId: null,
+          actionTargets: [],
         };
         layersRef.current.set(owner, layer);
       }
