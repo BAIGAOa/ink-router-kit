@@ -87,6 +87,8 @@ export interface ScreenKeyboardLayer {
 export interface StopOptions {
   /** If provided, stops only within the named focus target. */
   focusId?: string;
+  /**Mask the Action mode, otherwise the stop method will treat the Action ID as a normal Key*/
+  stopAction?: boolean;
 }
 
 /**
