@@ -241,7 +241,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           focusTargets: new Map(),
           focusOrder: [],
           currentFocusId: null,
-          actionTargets: [],
+          actionKeysMap: new Map(), // 用于存储 action ID 到 keys 的映射（屏幕级别）
         };
         layersRef.current.set(owner, layer);
       }
@@ -371,11 +371,32 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     }
   }
 
+  // 从 actionKeysMap 中移除指定 actionId 对应的 keys（若集合为空则删除整个条目）
+  function removeKeysFromActionMap(
+    map: Map<string, string[]>,
+    actionId: string,
+    keysToRemove: string[],
+  ) {
+    const arr = map.get(actionId);
+    if (!arr) return;
+    const filtered = arr.filter(k => !keysToRemove.includes(k));
+    if (filtered.length === 0) {
+      map.delete(actionId);
+    } else {
+      map.set(actionId, filtered);
+    }
+  }
+
   const getOrCreateFocusTarget = useCallback(
     (layer: ScreenKeyboardLayer, focusId: string) => {
       let target = layer.focusTargets.get(focusId);
       if (!target) {
-        target = { bindings: [], blockedKeys: [], stoppedKeys: [] };
+        target = {
+          bindings: [],
+          blockedKeys: [],
+          stoppedKeys: [],
+          actionKeysMap: new Map(), // 用于存储 action ID 到 keys 的映射（焦点目标级别）
+        };
         layer.focusTargets.set(focusId, target);
         layer.focusOrder.push(focusId);
         if (layer.currentFocusId === null) {
@@ -419,10 +440,23 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
         target.bindings.push(entry);
 
+        // 如果 handler 是字符串（actionId），将 keys 注册到 focus target 的 actionKeysMap
+        if (typeof handler === 'string') {
+          const existing = target.actionKeysMap.get(handler) || [];
+          for (const k of keys) {
+            if (!existing.includes(k)) existing.push(k);
+          }
+          target.actionKeysMap.set(handler, existing);
+        }
+
         return () => {
           const idx = target!.bindings.indexOf(entry);
           if (idx !== -1) target!.bindings.splice(idx, 1);
           cleanupGlobalKeyOverrides(layer, entry.keys);
+          // 解绑时同步清理 actionKeysMap
+          if (typeof handler === 'string') {
+            removeKeysFromActionMap(target!.actionKeysMap, handler, keys);
+          }
         };
 
 
@@ -435,10 +469,23 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
       layer.bindings.push(entry);
 
+      // 如果 handler 是字符串（actionId），将 keys 注册到 layer 的 actionKeysMap
+      if (typeof handler === 'string') {
+        const existing = layer.actionKeysMap.get(handler) || [];
+        for (const k of keys) {
+          if (!existing.includes(k)) existing.push(k);
+        }
+        layer.actionKeysMap.set(handler, existing);
+      }
+
       return () => {
         const idx = layer.bindings.indexOf(entry);
         if (idx !== -1) layer.bindings.splice(idx, 1);
         cleanupGlobalKeyOverrides(layer, entry.keys);
+        // 解绑时同步清理 actionKeysMap
+        if (typeof handler === 'string') {
+          removeKeysFromActionMap(layer.actionKeysMap, handler, keys);
+        }
       };
     },
     [getLayer],
@@ -492,10 +539,28 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       }
       const layer = getLayer(owner);
 
+      // 如果启用 stopAction 模式，则将传入的 action ID 转换为对应的键名
+      let effectiveKeys: string[] = keys;
+      if (options?.stopAction) {
+        const map = options.focusId
+          ? getOrCreateFocusTarget(layer, options.focusId).actionKeysMap
+          : layer.actionKeysMap;
+        const merged: string[] = [];
+        for (const actionId of keys) {
+          const boundKeys = map.get(actionId);
+          if (boundKeys) {
+            for (const k of boundKeys) {
+              if (!merged.includes(k)) merged.push(k);
+            }
+          }
+        }
+        effectiveKeys = merged;
+      }
+
       if (options?.focusId) {
         const target = getOrCreateFocusTarget(layer, options.focusId);
         const added: string[] = [];
-        for (const k of keys) {
+        for (const k of effectiveKeys) {
           if (!target.stoppedKeys.includes(k)) {
             target.stoppedKeys.push(k);
             added.push(k);
@@ -510,7 +575,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       } else {
         // 之前的stop逻辑，为了向后兼容得以保留
         const added: string[] = [];
-        for (const k of keys) {
+        for (const k of effectiveKeys) {
           if (!layer.stoppedKeys.includes(k)) {
             layer.stoppedKeys.push(k);
             added.push(k);
@@ -524,7 +589,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         };
       }
     },
-    [getLayer],
+    [getLayer, getOrCreateFocusTarget],
   );
 
 
