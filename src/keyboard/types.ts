@@ -59,6 +59,22 @@ export interface FocusTarget {
 }
 
 /**
+* It is used to record the registered Actions of each layer for the convenience of subsequent function processing
+* For example, the Action masking function of the stop method needs to know which Keys of the historical Screen Level have registered which Actions.
+*/
+export interface ActionTarget{
+  /**
+  * Which corresponding Keys are registered for this action
+  * An Action may be registered with multiple keys, so it needs to be an array.
+  */
+  keys: string[];
+  /**
+  * .Corresponding Action
+  */
+  action: string;
+}
+
+/**
  * Per-layer keyboard state: bindings, transparent keys, stop keys,
  * and focus targets.
  */
@@ -78,6 +94,8 @@ export interface ScreenKeyboardLayer {
   focusOrder: string[];
   /** The currently active focus target id, or null. */
   currentFocusId: string | null;
+
+  actionTargets: ActionTarget[];
 }
 
 /**
