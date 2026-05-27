@@ -1,4 +1,4 @@
-## ink-router-kit
+# ink-router-kit
 
 > Ready-to-use Ink components and tools for building terminal UI applications.
 
@@ -37,9 +37,9 @@ In ink-kit, **every React component is a "screen"**. Register them into a **scre
 
 No more global `useInput` cluttered with `if-else` chains. ink-kit's keyboard system maintains **per-screen-layer** key bindings. Events bubble from **top to bottom** through the stack, with three key mechanisms:
 
-- **Blocked Key (blockedKey)** — Let a key pass through the current layer to be handled below
-- **Stop (stop)** — Prevent a key from propagating to layers below
-- **Global Key (globalKeys)** — Shortcuts independent of the screen stack
+- **Blocked Key (`blockedKey`)** — Let a key pass through the current layer to be handled below
+- **Stop (`stop`)** — Prevent a key from propagating to lower layers. Supports `stopAction` mode to block by shortcut action ID instead of literal key name
+- **Global Key (`globalKeys`)** — Shortcuts independent of the screen stack
 
 #### Finer-grained partitioning
 
@@ -47,11 +47,27 @@ Within the same level, identical keys are also in competition. To address this, 
 Each level maintains a set of focus targets, and only one focus is active at any given time within a level. Each focus target has its own bound keyboard operations. Only the activated focus target is eligible to execute them during event dispatching in **useInput**.  
 
 **For more details, please refer to the API documentation.**
- 
+
+### Shortcut Actions
+
+Decouple operation definition from key binding with `defineShortcutAction`. Register named operations once, then reference them by string ID in `boundKeyboard`, `globalKeys`, and `stop`:
+
+```tsx
+defineShortcutAction([
+  { actionId: 'quit', action: () => process.exit() },
+]);
+boundKeyboard(['q'], 'quit');
+globalKeys([{ key: 'escape', operate: 'quit' }]);
+stop(['quit'], { stopAction: true });
+```
+
+### Overlay System
+
+`overlay()` and `closeOverlay()` provide floating dialogs on top of the screen stack. Combined with the keyboard system, overlays intercept keys before they reach the underlying screen — ideal for confirmation dialogs, modals, and pop-up menus.
 
 ### Module-Level Functions
 
-Navigation functions (`skip`, `back`, `gotoScreen`, etc.) work both inside React components (via hooks) and as **module-level imports** in any `.ts` / `.tsx` file. This allows non-UI layers — game engines, state managers, etc. — to trigger screen transitions.
+Navigation functions (`skip`, `back`, `gotoScreen`, `overlay`, `closeOverlay`) work both inside React components (via hooks) and as **module-level imports** in any `.ts` / `.tsx` file. This allows non-UI layers — game engines, state managers, etc. — to trigger screen transitions.
 
 ### Type Safety
 
@@ -86,14 +102,17 @@ Every API provides full TypeScript type inference. Functions like `skip`, `gotoS
 ## Documentation
 
 - **[Screen Management System](src/screen/README.md)** — `registerComponent`, `ScenarioManagementProvider`, `CurrentScreen`, `useScreenSystem`, `skip` / `back` / `gotoScreen` / `overlay` / `closeOverlay`
-- **[Keyboard System](src/keyboard/README.md)** — `KeyboardProvider`, `useKeyboard`, `boundKeyboard`, `blockedKey`, `stop`, `globalKeys`
+- **[Keyboard System](src/keyboard/README.md)** — `KeyboardProvider`, `useKeyboard`, `boundKeyboard`, `blockedKey`, `stop`, `globalKeys`, `defineShortcutAction`, focus management
 
 ---
-## Documentation for the components
 
-- **[SelectInput](src/components/select/README.md)** — Build your form from the comfort of your terminal
-- **[TextInput](src/components/text/README.md)** — Construct the input line in the terminal, and cooperate with the focus system and the keyboard system
-- **[MultiSelectInput](src/components/multi-select/README.md)** — Build a multi-select list and a task list in the terminal
+## Components
+
+- **[SelectInput](src/components/select/README.md)** — Single-select list with focus-aware keyboard navigation
+- **[TextInput](src/components/text/README.md)** — Text input with cursor, mask, and focus system integration
+- **[MultiSelectInput](src/components/multi-select/README.md)** — Multi-select list with checkbox toggling (Space to toggle, Enter to submit)
+- **[ConfirmDialog](src/components/dialog/README.md)** — Modal confirmation dialog with two buttons, designed for the overlay system
+
 ---
 
 ## Quick Overview
@@ -108,6 +127,9 @@ import {
   useScreenSystem,
   KeyboardProvider,
   useKeyboard,
+  overlay,
+  closeOverlay,
+  ConfirmDialog,
 } from '@baigao_h/ink-kit';
 
 // ── Register screens ──
@@ -139,6 +161,11 @@ function Game({ level }: { level: number }) {
 }
 registerComponent(Game, { level: 1 }, { parent: Menu });
 
+// Register the dialog so it can be used with overlay()
+registerComponent(ConfirmDialog, {
+  title: '', message: '', onConfirm: () => {}, onCancel: () => {},
+});
+
 // ── Wire up ──
 function App() {
   return (
@@ -156,10 +183,10 @@ render(
 ```
 
 ---
+
 ## More
 
-Because this is a special custom lightweight library that cannot be adapted to most components that rely on useInput, more components will be deeply integrated into this system in the future.
-
+More components are planned for deep integration into the keyboard and focus system, including Form, Tabs, and SearchInput.
 
 ## License
 

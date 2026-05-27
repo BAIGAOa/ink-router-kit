@@ -11,7 +11,6 @@ export {
   useScreenSystem,
 } from "./screen/index.js";
 
-
 export type {
   SkipOptions,
   SkipFn,
@@ -54,3 +53,7 @@ export type { MultiSelectInputProps } from "./components/multi-select/types.js";
 // Components — TextInput
 export { TextInput, UncontrolledTextInput } from "./components/text/TextInput.js";
 export type { TextInputProps, UncontrolledTextInputProps } from "./components/text/types.js";
+
+// Components — Dialog
+export { ConfirmDialog } from "./components/dialog/ConfirmDialog.js";
+export type { ConfirmDialogProps } from "./components/dialog/types.js";
