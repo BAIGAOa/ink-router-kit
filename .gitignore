@@ -144,3 +144,4 @@ vite.config.ts.timestamp-*
 
 .npmrc
 AI.md
+rule.md
