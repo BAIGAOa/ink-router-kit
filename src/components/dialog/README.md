@@ -177,8 +177,3 @@ render(
 );
 ```
 
-## See Also
-
-- [Overlay System](../screen/README.md#overlay) – how `overlay()` and `closeOverlay()` work
-- [Keyboard System](../keyboard/README.md) – focus management and key binding
-- [useFocusState](../keyboard/README.md#usefocusstate) – hook used internally for button focus
