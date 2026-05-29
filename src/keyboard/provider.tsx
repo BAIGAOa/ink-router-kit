@@ -519,7 +519,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
    * are skipped and the key propagates to the next layer below.
    */
   const penetration = useCallback(
-    (keys: string[], options?: BlockedKeyOptions) => {
+    (keys: string[], options?: BlockedKeyOptions): (() => void) => {
       const owner = getCurrentOwner();
       if (!owner) {
         throw new Error('[Ink-Router-Kit] blockedKey() must be called inside a screen component.');
@@ -528,23 +528,37 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
       if (options?.focusId) {
         const target = getOrCreateFocusTarget(layer, options.focusId);
+        const added: string[] = [];
         for (const k of keys) {
           if (!target.blockedKeys.includes(k)) {
             target.blockedKeys.push(k);
+            added.push(k);
           }
         }
-      } else {
-        // 向后兼容
-        for (const k of keys) {
-          if (!layer.blockedKeys.includes(k)) {
-            layer.blockedKeys.push(k);
+        return () => {
+          for (const k of added) {
+            const idx = target.blockedKeys.indexOf(k);
+            if (idx !== -1) target.blockedKeys.splice(idx, 1);
           }
+        };
+    } else {
+      const added: string[] = [];
+      for (const k of keys) {
+        if (!layer.blockedKeys.includes(k)) {
+          layer.blockedKeys.push(k);
+          added.push(k);
         }
       }
-    },
-    [getLayer, getOrCreateFocusTarget],
-  );
-
+      return () => {
+        for (const k of added) {
+            const idx = layer.blockedKeys.indexOf(k);
+              if (idx !== -1) layer.blockedKeys.splice(idx, 1);
+        }       
+      };
+    }
+  },
+  [getLayer, getOrCreateFocusTarget],
+);
   /**
    * Prevent keys from propagating beyond the current (top-of-stack) layer.
    *
