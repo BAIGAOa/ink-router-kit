@@ -210,7 +210,7 @@ describe('blockedKey 解绑函数', () => {
       const sc = useScreenSystem();
       const kb = useKeyboard();
       useEffect(() => {
-        kb.boundKeyboard(['b'], () => sc.back());
+        kb.boundKeyboard(['escape'], () => sc.back());
         kb.boundKeyboard(['a'], gameA);
         kb.boundKeyboard(['b'], gameB);
         kb.blockedKey(['a']);
