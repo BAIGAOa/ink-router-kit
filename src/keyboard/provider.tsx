@@ -19,27 +19,6 @@ import {
 } from './types.js';
 import { useScreenSystem } from '../screen/hook.js';
 
-let _currentPath: React.ComponentType<any>[] = [];
-let _currentOverlayComponent: React.ComponentType<any> | null = null;
-let _globalKeys: {
-  key: string | string[];
-  operate: () => void;
-  cover?: boolean;
-  affectOverlay?: boolean;
-  category?: React.ComponentType<any>[] | "*";
-}[] = [];
-let _focusSubscribers = new Set<() => void>();
-
-// 存储快捷操作的集合
-// 在某些场景下为了防止多次重复定义某个操作
-// 以及为了可以JSON配置化，我们就需要这个东西
-let _shortcutOperations = new Map<string, { action: () => void; keys?: string[] }>();
-
-
-export function clearShortcutOperations() {
-  _shortcutOperations.clear();
-}
-
 /**
  * Convert an Ink `(input, key)` event into a list of possible key-name
  * strings for matching.
@@ -136,18 +115,11 @@ function isNormalCharacter(input: string, key: Key): boolean {
   return true;
 }
 
-
-function notifyFocusChange() {
-  _focusSubscribers.forEach(fn => fn());
-}
-
-
-
 function checkGlobalKey(
   entry: GlobalKeyEntry,
   eventNames: string[],
   topComponent: React.ComponentType<any> | null,
-  layersRef: React.MutableRefObject<Map<React.ComponentType<any>, ScreenKeyboardLayer>>,
+  layersRef: React.MutableRefObject<Map<<React.ComponentType<any>, ScreenKeyboardLayer>>,
 ): boolean {
   const keyNames = Array.isArray(entry.key) ? entry.key : [entry.key];
   if (!keyNames.some((k) => eventNames.includes(k))) return false;
@@ -167,6 +139,85 @@ function checkGlobalKey(
   }
 
   return true;
+}
+
+function tryMatchBindings(
+  bindings: BoundKeyEntry[],
+  unblockedKeys: string[],
+  input: string,
+  key: Key,
+  skipBinding?: (binding: BoundKeyEntry) => boolean,
+): boolean {
+  if (unblockedKeys.length === 0) return false;
+
+  for (const binding of bindings) {
+    if (skipBinding && skipBinding(binding)) continue;
+    if (binding.keys.some((k) => unblockedKeys.includes(k))) {
+      binding.handler(input, key);
+      return true;
+    }
+  }
+
+  const wildcardBinding = bindings.find(b => b.keys.includes('*'));
+  if (wildcardBinding && isNormalCharacter(input, key)) {
+    if (!skipBinding || !skipBinding(wildcardBinding)) {
+      wildcardBinding.handler(input, key);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function handleTabNavigation(
+  layer: ScreenKeyboardLayer,
+  eventNames: string[],
+  shift: boolean,
+  notifyFocusChange: () => void,
+): boolean {
+  if (!eventNames.includes('tab') || layer.focusOrder.length === 0) return false;
+  const current = layer.currentFocusId;
+  let idx = current ? layer.focusOrder.indexOf(current) : -1;
+  if (shift) {
+    idx = idx <= 0 ? layer.focusOrder.length - 1 : idx - 1;
+  } else {
+    idx = (idx + 1) % layer.focusOrder.length;
+  }
+  layer.currentFocusId = layer.focusOrder[idx];
+  notifyFocusChange();
+  return true;
+}
+
+function cleanupGlobalKeyOverrides(
+  layer: ScreenKeyboardLayer,
+  keys: string[],
+): void {
+  for (const k of keys) {
+    const stillBound =
+      layer.bindings.some(b => b.keys.includes(k)) ||
+      [...layer.focusTargets.values()].some(ft =>
+        ft.bindings.some(b => b.keys.includes(k))
+      );
+    if (!stillBound) {
+      layer.globalKeyOverrides.delete(k);
+    }
+  }
+}
+
+// 从 actionKeysMap 中移除指定 actionId 对应的 keys（若集合为空则删除整个条目）
+function removeKeysFromActionMap(
+  map: Map<string, string[]>,
+  actionId: string,
+  keysToRemove: string[],
+) {
+  const arr = map.get(actionId);
+  if (!arr) return;
+  const filtered = arr.filter(k => !keysToRemove.includes(k));
+  if (filtered.length === 0) {
+    map.delete(actionId);
+  } else {
+    map.set(actionId, filtered);
+  }
 }
 
 export interface KeyboardProviderProps {
@@ -191,9 +242,28 @@ export interface KeyboardProviderProps {
 export function KeyboardProvider({ children }: KeyboardProviderProps) {
   const { currentPath, currentOverlay } = useScreenSystem();
 
-  _currentPath = currentPath;
+  // 使用 useRef 替代模块级全局变量，实现多实例隔离
+  const pathRef = useRef<<React.ComponentType<any>[]>(currentPath);
+  const overlayRef = useRef<<React.ComponentType<any> | null>(null);
+  const globalKeysRef = useRef<<{
+    key: string | string[];
+    operate: () => void;
+    cover?: boolean;
+    affectOverlay?: boolean;
+    category?: React.ComponentType<any>[] | "*";
+  }[]>([]);
+  const focusSubscribersRef = useRef(new Set<<() => void>());
 
-  _currentOverlayComponent = currentOverlay
+  // 存储快捷操作的集合
+  // 在某些场景下为了防止多次重复定义某个操作
+  // 以及为了可以JSON配置化，我们就需要这个东西
+  const shortcutOperationsRef = useRef(
+    new Map<string, { action: () => void; keys?: string[] }>()
+  );
+
+  // 每次渲染同步最新值（无副作用，只是指针赋值）
+  pathRef.current = currentPath;
+  overlayRef.current = currentOverlay
     ? (currentOverlay as React.ReactElement).type as React.ComponentType<any>
     : null;
 
@@ -204,10 +274,10 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     >
   >(new Map());
 
-  const prevPathRef = useRef<React.ComponentType<any>[]>([]);
+  const prevPathRef = useRef<<React.ComponentType<any>[]>([]);
 
   // 覆盖层是独立的
-  const prevOverlayRef = useRef<React.ComponentType<any> | null>(null);
+  const prevOverlayRef = useRef<<React.ComponentType<any> | null>(null);
 
 
   useEffect(() => {
@@ -251,142 +321,15 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     [],
   );
 
-  function tryMatchBindings(
-    bindings: BoundKeyEntry[],
-    unblockedKeys: string[],
-    input: string,
-    key: Key,
-    skipBinding?: (binding: BoundKeyEntry) => boolean,
-  ): boolean {
-    if (unblockedKeys.length === 0) return false;
-
-    for (const binding of bindings) {
-      if (skipBinding && skipBinding(binding)) continue;
-      if (binding.keys.some((k) => unblockedKeys.includes(k))) {
-        binding.handler(input, key);
-        return true;
-      }
-    }
-
-    const wildcardBinding = bindings.find(b => b.keys.includes('*'));
-    if (wildcardBinding && isNormalCharacter(input, key)) {
-      if (!skipBinding || !skipBinding(wildcardBinding)) {
-        wildcardBinding.handler(input, key);
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  function handleTabNavigation(
-    layer: ScreenKeyboardLayer,
-    eventNames: string[],
-    shift: boolean,
-  ): boolean {
-    if (!eventNames.includes('tab') || layer.focusOrder.length === 0) return false;
-    const current = layer.currentFocusId;
-    let idx = current ? layer.focusOrder.indexOf(current) : -1;
-    if (shift) {
-      idx = idx <= 0 ? layer.focusOrder.length - 1 : idx - 1;
-    } else {
-      idx = (idx + 1) % layer.focusOrder.length;
-    }
-    layer.currentFocusId = layer.focusOrder[idx];
-    notifyFocusChange();
-    return true;
-  }
-
-  function getCurrentOwner(): React.ComponentType<any> | null {
-    const path = _currentPath;
+  const getCurrentOwner = useCallback((): React.ComponentType<any> | null => {
+    const path = pathRef.current;
     if (path.length === 0) return null;
-    return _currentOverlayComponent || path[path.length - 1];
-  }
+    return overlayRef.current || path[path.length - 1];
+  }, []);
 
-  function createBoundKeyEntry(
-    keys: string[],
-    handler: KeyHandler | string,
-    onlyThis: boolean,
-    owner: React.ComponentType<any>,
-  ): BoundKeyEntry {
-    if (typeof handler === 'string') {
-      const entry = _shortcutOperations.get(handler);
-      if (!entry) {
-        throw new Error(
-          `[Ink-Router-Kit] The shortcut key you used does not exist with ID ${handler}`,
-        );
-      }
-      return { keys, handler: entry.action, onlyThis, owner };
-    }
-    return { keys, handler, onlyThis, owner };
-  }
-
-  function cleanupGlobalKeyOverrides(
-    layer: ScreenKeyboardLayer,
-    keys: string[],
-  ): void {
-    for (const k of keys) {
-      const stillBound =
-        layer.bindings.some(b => b.keys.includes(k)) ||
-        [...layer.focusTargets.values()].some(ft =>
-          ft.bindings.some(b => b.keys.includes(k))
-        );
-      if (!stillBound) {
-        layer.globalKeyOverrides.delete(k);
-      }
-    }
-  }
-
-  function applyGlobalKeyOverrides(
-    keys: string[],
-    owner: React.ComponentType<any>,
-    layer: ScreenKeyboardLayer,
-    bindingContext: string,
-  ): void {
-    for (const gk of _globalKeys) {
-      const gkKeys = Array.isArray(gk.key) ? gk.key : [gk.key];
-      const matchingKeys = gkKeys.filter((k) => keys.includes(k));
-      if (matchingKeys.length === 0) continue;
-
-      const cat = gk.category;
-      let inCategory = false;
-      if (cat === undefined || cat === '*') {
-        inCategory = true;
-      } else if (Array.isArray(cat)) {
-        inCategory = cat.includes(owner);
-      }
-      if (!inCategory) continue;
-
-      const cover = gk.cover ?? true;
-      if (!cover) {
-        throw new Error(
-          `[Ink-Router-Kit] Component "${owner.displayName || owner.name || 'anonymous'}" ` +
-          `attempted to bind "${matchingKeys[0]}" via ${bindingContext}, ` +
-          `but this key is already declared in globalKeys with cover: false, so overriding is not allowed.`,
-        );
-      }
-
-      for (const k of matchingKeys) {
-        layer.globalKeyOverrides.add(k);
-      }
-    }
-  }
-
-  // 从 actionKeysMap 中移除指定 actionId 对应的 keys（若集合为空则删除整个条目）
-  function removeKeysFromActionMap(
-    map: Map<string, string[]>,
-    actionId: string,
-    keysToRemove: string[],
-  ) {
-    const arr = map.get(actionId);
-    if (!arr) return;
-    const filtered = arr.filter(k => !keysToRemove.includes(k));
-    if (filtered.length === 0) {
-      map.delete(actionId);
-    } else {
-      map.set(actionId, filtered);
-    }
-  }
+  const notifyFocusChange = useCallback(() => {
+    focusSubscribersRef.current.forEach(fn => fn());
+  }, []);
 
   const getOrCreateFocusTarget = useCallback(
     (layer: ScreenKeyboardLayer, focusId: string) => {
@@ -407,7 +350,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       }
       return target;
     },
-    [],
+    [notifyFocusChange],
   );
 
   /**
@@ -427,15 +370,71 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       maybeOptions?: BoundKeyboardOptions,
     ): (() => void) => {
 
+      function createBoundKeyEntry(
+        keys: string[],
+        handler: KeyHandler | string,
+        onlyThis: boolean,
+        owner: React.ComponentType<any>,
+      ): BoundKeyEntry {
+        if (typeof handler === 'string') {
+          const entry = shortcutOperationsRef.current.get(handler);
+          if (!entry) {
+            throw new Error(
+              `[Ink-Router-Kit] The shortcut key you used does not exist with ID ${handler}`,
+            );
+          }
+          return { keys, handler: entry.action, onlyThis, owner };
+        }
+        return { keys, handler, onlyThis, owner };
+      }
+
+      function applyGlobalKeyOverrides(
+        keys: string[],
+        owner: React.ComponentType<any>,
+        layer: ScreenKeyboardLayer,
+        bindingContext: string,
+      ): void {
+        for (const gk of globalKeysRef.current) {
+          const gkKeys = Array.isArray(gk.key) ? gk.key : [gk.key];
+          const matchingKeys = gkKeys.filter((k) => keys.includes(k));
+          if (matchingKeys.length === 0) continue;
+
+          const cat = gk.category;
+          let inCategory = false;
+          if (cat === undefined || cat === '*') {
+            inCategory = true;
+          } else if (Array.isArray(cat)) {
+            inCategory = cat.includes(owner);
+          }
+          if (!inCategory) continue;
+
+          const cover = gk.cover ?? true;
+          if (!cover) {
+            throw new Error(
+              `[Ink-Router-Kit] Component "${owner.displayName || owner.name || 'anonymous'}" ` +
+              `attempted to bind "${matchingKeys[0]}" via ${bindingContext}, ` +
+              `but this key is already declared in globalKeys with cover: false, so overriding is not allowed.`,
+            );
+          }
+
+          for (const k of matchingKeys) {
+            layer.globalKeyOverrides.add(k);
+          }
+        }
+      }
+
+      // 重载解析：快捷操作模式
       if (typeof keysOrActionId === 'string' && typeof handlerOrOptions !== 'function' && typeof handlerOrOptions !== 'string') {
         const actionId = keysOrActionId;
         const options = handlerOrOptions as BoundKeyboardOptions;
-        const entry = _shortcutOperations.get(actionId);
+        const entry = shortcutOperationsRef.current.get(actionId);
         if (!entry) {
           throw new Error(`[Ink-Router-Kit] Action "${actionId}" is not registered.`);
         }
         if (!entry.keys || entry.keys.length === 0) {
-          throw new Error(`[Ink-Router-Kit] Action "${actionId}" does not have predefined keys. Please register with keys field or call boundKeyboard with explicit keys.`);
+          throw new Error(
+            `[Ink-Router-Kit] Action "${actionId}" does not have predefined keys. Please register with keys field or call boundKeyboard with explicit keys.`,
+          );
         }
         // 递归调用原有实现
         return boundKeyboard(entry.keys, actionId, options);
@@ -509,7 +508,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         }
       };
     },
-    [getLayer, getOrCreateFocusTarget],
+    [getCurrentOwner, getLayer, getOrCreateFocusTarget],
   );
 
   /**
@@ -519,7 +518,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
    * are skipped and the key propagates to the next layer below.
    */
   const penetration = useCallback(
-    (keys: string[], options?: BlockedKeyOptions): (() => void) => {
+    (keys: string[], options?: BlockedKeyOptions) => {
       const owner = getCurrentOwner();
       if (!owner) {
         throw new Error('[Ink-Router-Kit] blockedKey() must be called inside a screen component.');
@@ -528,37 +527,23 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
       if (options?.focusId) {
         const target = getOrCreateFocusTarget(layer, options.focusId);
-        const added: string[] = [];
         for (const k of keys) {
           if (!target.blockedKeys.includes(k)) {
             target.blockedKeys.push(k);
-            added.push(k);
           }
         }
-        return () => {
-          for (const k of added) {
-            const idx = target.blockedKeys.indexOf(k);
-            if (idx !== -1) target.blockedKeys.splice(idx, 1);
+      } else {
+        // 向后兼容
+        for (const k of keys) {
+          if (!layer.blockedKeys.includes(k)) {
+            layer.blockedKeys.push(k);
           }
-        };
-    } else {
-      const added: string[] = [];
-      for (const k of keys) {
-        if (!layer.blockedKeys.includes(k)) {
-          layer.blockedKeys.push(k);
-          added.push(k);
         }
       }
-      return () => {
-        for (const k of added) {
-            const idx = layer.blockedKeys.indexOf(k);
-              if (idx !== -1) layer.blockedKeys.splice(idx, 1);
-        }       
-      };
-    }
-  },
-  [getLayer, getOrCreateFocusTarget],
-);
+    },
+    [getCurrentOwner, getLayer, getOrCreateFocusTarget],
+  );
+
   /**
    * Prevent keys from propagating beyond the current (top-of-stack) layer.
    *
@@ -624,13 +609,13 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         };
       }
     },
-    [getLayer, getOrCreateFocusTarget],
+    [getCurrentOwner, getLayer, getOrCreateFocusTarget],
   );
 
 
   const subscribeFocus = useCallback((listener: () => void) => {
-    _focusSubscribers.add(listener);
-    return () => { _focusSubscribers.delete(listener); };
+    focusSubscribersRef.current.add(listener);
+    return () => { focusSubscribersRef.current.delete(listener); };
   }, []);
 
   const focusSet = useCallback(
@@ -644,7 +629,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         notifyFocusChange();
       }
     },
-    [],
+    [getCurrentOwner, notifyFocusChange],
   );
 
   const focusNext = useCallback(() => {
@@ -658,7 +643,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     idx = (idx + 1) % layer.focusOrder.length;
     layer.currentFocusId = layer.focusOrder[idx];
     notifyFocusChange();
-  }, []);
+  }, [getCurrentOwner, notifyFocusChange]);
 
   const focusPrev = useCallback(() => {
     const owner = getCurrentOwner();
@@ -671,14 +656,14 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     idx = idx <= 0 ? layer.focusOrder.length - 1 : idx - 1;
     layer.currentFocusId = layer.focusOrder[idx];
     notifyFocusChange();
-  }, []);
+  }, [getCurrentOwner, notifyFocusChange]);
 
   const focusCurrent = useCallback((): string | null => {
     const owner = getCurrentOwner();
     if (!owner) return null;
     const layer = layersRef.current.get(owner);
     return layer?.currentFocusId ?? null;
-  }, []);
+  }, [getCurrentOwner]);
 
   const focusUnregister = useCallback((focusId: string) => {
     const owner = getCurrentOwner();
@@ -695,7 +680,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         layer.focusOrder.length > 0 ? layer.focusOrder[0] : null;
       notifyFocusChange();
     }
-  }, []);
+  }, [getCurrentOwner, notifyFocusChange]);
 
   /**
    * Register global key bindings.
@@ -709,14 +694,14 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     (entries: GlobalKeyEntry[]) => {
       // 根据预期特性，每一次调用都应该重置全局键集合
       // 后续都是这样，所以每次调用都相当于直接替换
-      _globalKeys = []
+      const next: typeof globalKeysRef.current = [];
       for (const each of entries) {
         if (typeof each.operate === 'string') {
-          const entry = _shortcutOperations.get(each.operate)
+          const entry = shortcutOperationsRef.current.get(each.operate)
           if (!entry) {
             throw new Error(`[Ink-Kit-Router]You want to call the shortcut ${each.operate} in the global key, but it is not registered`)
           }
-          _globalKeys.push({
+          next.push({
             key: each.key,
             operate: entry.action,
             cover: each.cover,
@@ -724,7 +709,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
             affectOverlay: each.affectOverlay
           })
         } else {
-          _globalKeys.push({
+          next.push({
             key: each.key,
             operate: each.operate,
             cover: each.cover,
@@ -734,17 +719,18 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         }
 
       }
+      globalKeysRef.current = next;
     },
     [],
   );
 
   const defineShortcutAction = useCallback((entries: ShortcutOperationEntry[]) => {
     for (const each of entries) {
-      if (_shortcutOperations.has(each.actionId)) {
+      if (shortcutOperationsRef.current.has(each.actionId)) {
         throw new Error(`[Ink-Router-Kit]Duplicate shortcut cannot be defined with ID ${each.actionId}`)
       }
       // 存储 action 函数和可选的 keys
-      _shortcutOperations.set(each.actionId, {
+      shortcutOperationsRef.current.set(each.actionId, {
         action: each.action,
         keys: each.keys,
       })
@@ -759,7 +745,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
    * @throws If the action does not exist or was not registered with a `keys` field.
    */
   const modifyAction = useCallback((actionId: string, keys: string[]) => {
-    const entry = _shortcutOperations.get(actionId);
+    const entry = shortcutOperationsRef.current.get(actionId);
     if (!entry) {
       throw new Error(`[Ink-Router-Kit] Cannot modify action "${actionId}": action not registered.`);
     }
@@ -769,6 +755,10 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     }
     // 直接覆盖
     entry.keys = keys;
+  }, []);
+
+  const clearShortcutOperations = useCallback(() => {
+    shortcutOperationsRef.current.clear();
   }, []);
 
   const value = useMemo(
@@ -785,6 +775,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       subscribeFocus,
       defineShortcutAction,
       modifyAction,
+      clearShortcutOperations,
     }),
     [
       boundKeyboard,
@@ -799,17 +790,19 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       subscribeFocus,
       defineShortcutAction,
       modifyAction,
+      clearShortcutOperations,
     ],
   );
 
   useInput((input, key) => {
     const eventNames = normalizeKeyNames(input, key);
-    const path = _currentPath;
+    const path = pathRef.current;
     const topComponent = path.length > 0 ? path[path.length - 1] : null;
-    const overlayComp = _currentOverlayComponent;
+    const overlayComp = overlayRef.current;
+    const globalKeys = globalKeysRef.current;
 
 
-    for (const entry of _globalKeys) {
+    for (const entry of globalKeys) {
       if (!entry.affectOverlay) continue;
       if (checkGlobalKey(entry, eventNames, topComponent, layersRef)) {
         entry.operate();
@@ -821,7 +814,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     if (overlayComp) {
       const overlayLayer = layersRef.current.get(overlayComp);
       if (overlayLayer) {
-        if (handleTabNavigation(overlayLayer, eventNames, key.shift)) return;
+        if (handleTabNavigation(overlayLayer, eventNames, key.shift, notifyFocusChange)) return;
 
         const blocked = overlayLayer.blockedKeys;
         const unblocked = eventNames.filter((n) => !blocked.includes(n));
@@ -851,7 +844,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     }
 
 
-    for (const entry of _globalKeys) {
+    for (const entry of globalKeys) {
       if (entry.affectOverlay) continue;
       if (checkGlobalKey(entry, eventNames, topComponent, layersRef)) {
         entry.operate();
@@ -866,7 +859,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       if (!layer) continue;
       const isTop = i === path.length - 1;
 
-      if (isTop && handleTabNavigation(layer, eventNames, key.shift)) return;
+      if (isTop && handleTabNavigation(layer, eventNames, key.shift, notifyFocusChange)) return;
 
       const blocked = layer.blockedKeys;
       const unblocked = eventNames.filter((n) => !blocked.includes(n));
