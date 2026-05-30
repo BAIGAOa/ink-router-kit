@@ -57,3 +57,25 @@ export type { TextInputProps, UncontrolledTextInputProps } from "./components/te
 // Components — Dialog
 export { ConfirmDialog } from "./components/dialog/ConfirmDialog.js";
 export type { ConfirmDialogProps } from "./components/dialog/types.js";
+
+// Components — Spinner
+export { Spinner } from "./components/spinner/Spinner.js";
+export type { SpinnerType } from "./components/spinner/Spinner.js";
+
+// Components — ProgressBar
+export { ProgressBar } from "./components/progress-bar/ProgressBar.js";
+
+// Components — Divider
+export { Divider } from "./components/divider/Divider.js";
+
+// Components — Badge
+export { Badge } from "./components/badge/Badge.js";
+
+// Components — KeyHint
+export { KeyHint } from "./components/key-hint/KeyHint.js";
+
+// Components — NumberInput
+export { NumberInput } from "./components/number-input/NumberInput.js";
+
+// Components — SearchInput
+export { SearchInput } from "./components/search-input/SearchInput.js";
