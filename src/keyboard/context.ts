@@ -148,6 +148,11 @@ export interface KeyboardContextValue {
    * @throws If the action does not exist or was not registered with a `keys` field.
    */
   modifyAction: (actionId: string, keys: string[]) => void;
+  /**
+   * Clear all registered shortcut operations.
+   * Primarily used for testing or full keyboard reset scenarios.
+   */
+  clearShortcutOperations: () => void;
 }
 
 /**
