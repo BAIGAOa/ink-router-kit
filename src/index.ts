@@ -79,3 +79,15 @@ export { NumberInput } from "./components/number-input/NumberInput.js";
 
 // Components — SearchInput
 export { SearchInput } from "./components/search-input/SearchInput.js";
+
+// Components — Form
+export { Form } from "./components/form/Form.js";
+export { Field } from "./components/form/Field.js";
+export { useFormContext } from "./components/form/context.js";
+export type {
+  FormProps,
+  FieldProps,
+  FieldRenderProps,
+  FormContextValue,
+  Validator,
+} from "./components/form/types.js";
