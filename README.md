@@ -108,9 +108,23 @@ Every API provides full TypeScript type inference. Functions like `skip`, `gotoS
 
 ## Components
 
+### Selection & Input
 - **[SelectInput](src/components/select/README.md)** — Single-select list with focus-aware keyboard navigation
-- **[TextInput](src/components/text/README.md)** — Text input with cursor, mask, and focus system integration
 - **[MultiSelectInput](src/components/multi-select/README.md)** — Multi-select list with checkbox toggling (Space to toggle, Enter to submit)
+- **[TextInput](src/components/text/README.md)** — Text input with cursor, mask, and focus system integration
+- **[SearchInput](src/components/search-input/README.md)** — Search field with 🔍 icon and Esc-to-clear
+- **[NumberInput](src/components/number-input/README.md)** — Numeric stepper with min/max/step and keyboard controls
+
+### Display & Feedback
+- **[Spinner](src/components/spinner/README.md)** — Animated spinner with multiple preset styles
+- **[ProgressBar](src/components/progress-bar/README.md)** — Customizable progress bar with percentage display
+- **[Badge](src/components/badge/README.md)** — Colored label/tag component
+- **[KeyHint](src/components/key-hint/README.md)** — Keyboard shortcut hint bar (`[S] Save`)
+
+### Layout
+- **[Divider](src/components/divider/README.md)** — Horizontal separator with optional centered label
+
+### Dialog
 - **[ConfirmDialog](src/components/dialog/README.md)** — Modal confirmation dialog with two buttons, designed for the overlay system
 
 ---
@@ -184,9 +198,9 @@ render(
 
 ---
 
-## More
+## Coming Soon
 
-More components are planned for deep integration into the keyboard and focus system, including Form, Tabs, and SearchInput.
+More components are planned for deep integration into the keyboard and focus system, including Form and Tabs.
 
 ## Other
 
