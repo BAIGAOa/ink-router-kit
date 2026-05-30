@@ -46,7 +46,7 @@ export function Form({ children, onSubmit, onError, initialValues = {}, submitRe
   const rulesRef = useRef<Record<string, Validator[]>>({});
   const focusIdRef = useRef<Record<string, string>>({});
 
-  const { boundKeyboard, focusSet } = useKeyboard();
+  const { focusSet, globalKeys } = useKeyboard();
 
   /**
    * Register a field's validation rules and default value.
@@ -149,12 +149,14 @@ export function Form({ children, onSubmit, onError, initialValues = {}, submitRe
     if (submitRef) submitRef.current = submitForm;
   }, [submitForm, submitRef]);
 
-  // Bind Ctrl+Enter to submit (uses screen-level binding to avoid
-  // conflicting with TextInput's focus-target Enter binding).
+  // Bind Ctrl+Enter to submit via globalKeys so it fires before
+  // focus-target bindings (avoiding SelectInput/MultiSelectInput's
+  // 'return' binding from consuming the event first).
   useEffect(() => {
-    const unBind = boundKeyboard(['ctrl+return'], () => submitForm());
-    return () => unBind();
-  }, [boundKeyboard, submitForm]);
+    globalKeys([
+      { key: 'ctrl+return', operate: () => submitForm(), cover: false, affectOverlay: false },
+    ]);
+  }, [globalKeys, submitForm]);
 
   /**
    * Wrapper around registerField that also stores the field's focusId
