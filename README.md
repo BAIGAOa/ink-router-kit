@@ -124,6 +124,9 @@ Every API provides full TypeScript type inference. Functions like `skip`, `gotoS
 ### Layout
 - **[Divider](src/components/divider/README.md)** — Horizontal separator with optional centered label
 
+### Form
+- **[Form & Field](src/components/form/README.md)** — Context‑based form system with validation, error focus, and Ctrl+Enter submit
+
 ### Dialog
 - **[ConfirmDialog](src/components/dialog/README.md)** — Modal confirmation dialog with two buttons, designed for the overlay system
 
