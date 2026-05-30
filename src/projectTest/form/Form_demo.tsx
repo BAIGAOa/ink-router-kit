@@ -125,14 +125,14 @@ function FormDemo() {
           {/* ── Age ───────────────────────────── */}
           <Box flexDirection="column" marginBottom={1}>
             <Text bold>Age</Text>
-            <Field name="age" rules={[required, between(13, 120)]} defaultValue="">
+            <Field name="age" rules={[required, between(13, 120)]}>
               {({ value, onChange, focusId }) => (
                 <NumberInput
                   focusId={focusId}
                   value={Number(value || 0)}
                   onChange={(v) => onChange(String(v))}
-                  min={0}
-                  max={150}
+                  min={13}
+                  max={120}
                 />
               )}
             </Field>
@@ -218,7 +218,7 @@ function App() {
 
   React.useEffect(() => {
     boundKeyboard(['q'], () => process.exit(0));
-  }, []);
+  }, [boundKeyboard]);
 
   return <CurrentScreen />;
 }
