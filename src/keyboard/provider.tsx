@@ -119,7 +119,7 @@ function checkGlobalKey(
   entry: GlobalKeyEntry,
   eventNames: string[],
   topComponent: React.ComponentType<any> | null,
-  layersRef: React.MutableRefObject<Map<<React.ComponentType<any>, ScreenKeyboardLayer>>,
+  layersRef: React.MutableRefObject<Map<React.ComponentType<any>, ScreenKeyboardLayer>>,
 ): boolean {
   const keyNames = Array.isArray(entry.key) ? entry.key : [entry.key];
   if (!keyNames.some((k) => eventNames.includes(k))) return false;
@@ -220,6 +220,21 @@ function removeKeysFromActionMap(
   }
 }
 
+/**
+ * Clear all registered shortcut operations.
+ *
+ * NOTE: Since the refactoring to per-instance useRef state, this function
+ * is a no-op at module level. Shortcut operations are now scoped to each
+ * {@link KeyboardProvider} instance and are automatically cleaned up when
+ * the provider unmounts.
+ *
+ * Kept for backward compatibility with tests and external consumers that
+ * call this function in cleanup routines.
+ */
+export function clearShortcutOperations(): void {
+  // No-op: state is now per-instance via useRef inside KeyboardProvider
+}
+
 export interface KeyboardProviderProps {
   children: ReactNode;
 }
@@ -243,16 +258,16 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   const { currentPath, currentOverlay } = useScreenSystem();
 
   // 使用 useRef 替代模块级全局变量，实现多实例隔离
-  const pathRef = useRef<<React.ComponentType<any>[]>(currentPath);
-  const overlayRef = useRef<<React.ComponentType<any> | null>(null);
-  const globalKeysRef = useRef<<{
+  const pathRef = useRef<React.ComponentType<any>[]>(currentPath);
+  const overlayRef = useRef<React.ComponentType<any> | null>(null);
+  const globalKeysRef = useRef<{
     key: string | string[];
     operate: () => void;
     cover?: boolean;
     affectOverlay?: boolean;
     category?: React.ComponentType<any>[] | "*";
   }[]>([]);
-  const focusSubscribersRef = useRef(new Set<<() => void>());
+  const focusSubscribersRef = useRef(new Set<() => void>());
 
   // 存储快捷操作的集合
   // 在某些场景下为了防止多次重复定义某个操作
@@ -274,10 +289,10 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     >
   >(new Map());
 
-  const prevPathRef = useRef<<React.ComponentType<any>[]>([]);
+  const prevPathRef = useRef<React.ComponentType<any>[]>([]);
 
   // 覆盖层是独立的
-  const prevOverlayRef = useRef<<React.ComponentType<any> | null>(null);
+  const prevOverlayRef = useRef<React.ComponentType<any> | null>(null);
 
 
   useEffect(() => {
@@ -518,7 +533,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
    * are skipped and the key propagates to the next layer below.
    */
   const penetration = useCallback(
-    (keys: string[], options?: BlockedKeyOptions) => {
+    (keys: string[], options?: BlockedKeyOptions): (() => void) => {
       const owner = getCurrentOwner();
       if (!owner) {
         throw new Error('[Ink-Router-Kit] blockedKey() must be called inside a screen component.');
@@ -527,19 +542,35 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
       if (options?.focusId) {
         const target = getOrCreateFocusTarget(layer, options.focusId);
+        const added: string[] = [];
         for (const k of keys) {
           if (!target.blockedKeys.includes(k)) {
             target.blockedKeys.push(k);
+            added.push(k);
           }
         }
-      } else {
-        // 向后兼容
-        for (const k of keys) {
-          if (!layer.blockedKeys.includes(k)) {
-            layer.blockedKeys.push(k);
+        return () => {
+          for (const k of added) {
+            const idx = target.blockedKeys.indexOf(k);
+            if (idx !== -1) target.blockedKeys.splice(idx, 1);
           }
+        };
+      }
+
+      // 向后兼容
+      const added: string[] = [];
+      for (const k of keys) {
+        if (!layer.blockedKeys.includes(k)) {
+          layer.blockedKeys.push(k);
+          added.push(k);
         }
       }
+      return () => {
+        for (const k of added) {
+          const idx = layer.blockedKeys.indexOf(k);
+          if (idx !== -1) layer.blockedKeys.splice(idx, 1);
+        }
+      };
     },
     [getCurrentOwner, getLayer, getOrCreateFocusTarget],
   );
