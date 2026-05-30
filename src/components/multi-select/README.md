@@ -82,6 +82,8 @@ const [selected, setSelected] = useState<string[]>(['green']);
 | `Space` | Toggle selection on highlighted item |
 | `Enter` | Submit current selection (`onSubmit`) |
 | `1`–`9` | Toggle the Nth visible item |
+| `a` | Select all items |
+| `q` | Deselect all items (clear selection) |
 
 When the component is **not** the active focus target (e.g. another input has focus), all keyboard events are automatically ignored. The visual highlight is hidden, but selection checkboxes remain visible.
 

@@ -181,6 +181,9 @@ export function MultiSelectInput<T, I extends Item<T> = Item<T>>({
   const isControlledRef = useRef(isControlled);
   isControlledRef.current = isControlled;
 
+  const allItemsRef = useRef(items);
+  allItemsRef.current = items;
+
   // items 变化时修正 scroll / highlight 溢出
   useEffect(() => {
     if (items.length === 0) {
@@ -319,6 +322,49 @@ export function MultiSelectInput<T, I extends Item<T> = Item<T>>({
       { focusId: fid },
     );
 
+    // a 全选
+    const unSelectAll = boundKeyboard(
+      ['a'],
+      () => {
+        const allItems = allItemsRef.current;
+        const allValues = allItems.map((item) => item.value);
+
+        for (const item of allItems) {
+          if (!selectedSetRef.current.has(item.value)) {
+            onSelectRef.current?.(item);
+          }
+        }
+
+        onChangeRef.current?.(allValues);
+
+        if (!isControlledRef.current) {
+          setInternalSelected(allValues);
+        }
+      },
+      { focusId: fid },
+    );
+
+    // q 取消全选
+    const unDeselectAll = boundKeyboard(
+      ['q'],
+      () => {
+        const allItems = allItemsRef.current;
+
+        for (const item of allItems) {
+          if (selectedSetRef.current.has(item.value)) {
+            onUnselectRef.current?.(item);
+          }
+        }
+
+        onChangeRef.current?.([]);
+
+        if (!isControlledRef.current) {
+          setInternalSelected([]);
+        }
+      },
+      { focusId: fid },
+    );
+
     // 数字键 1-9 直接切换对应可见项
     const numUnbinds: Array<() => void> = [];
     for (
@@ -344,6 +390,8 @@ export function MultiSelectInput<T, I extends Item<T> = Item<T>>({
       unDown();
       unSpace();
       unReturn();
+      unSelectAll();
+      unDeselectAll();
       numUnbinds.forEach((fn) => fn());
       focusUnregister(fid);
     };

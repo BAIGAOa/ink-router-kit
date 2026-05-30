@@ -412,6 +412,101 @@ describe('空格切换选中', () => {
   });
 });
 
+describe('全选/取消全选', () => {
+  it('a 选中所有项', async () => {
+    const onChange = vi.fn();
+    const { stdin } = renderControlled({
+      focusId: 'test',
+      items: threeItems,
+      onChange,
+    });
+
+    await press(stdin, 'a');
+    expect(onChange).toHaveBeenCalledWith(['dark', 'light', 'cyberpunk']);
+  });
+
+  it('a 触发每个未选中项的 onSelect', async () => {
+    const onSelect = vi.fn();
+    const { stdin } = renderControlled({
+      focusId: 'test',
+      items: threeItems,
+      onSelect,
+    });
+
+    await press(stdin, 'a');
+    expect(onSelect).toHaveBeenCalledTimes(3);
+    expect(onSelect).toHaveBeenCalledWith(threeItems[0]);
+    expect(onSelect).toHaveBeenCalledWith(threeItems[1]);
+    expect(onSelect).toHaveBeenCalledWith(threeItems[2]);
+  });
+
+  it('q 取消所有选中', async () => {
+    const onChange = vi.fn();
+    const { stdin } = renderControlled({
+      focusId: 'test',
+      items: threeItems,
+      onChange,
+    });
+
+    await press(stdin, 'a');
+    onChange.mockClear();
+
+    await press(stdin, 'q');
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it('q 触发每个已选项的 onUnselect', async () => {
+    const onUnselect = vi.fn();
+    const { stdin } = renderControlled({
+      focusId: 'test',
+      items: threeItems,
+      onUnselect,
+    });
+
+    // 先全选，再取消全选
+    await press(stdin, 'a');
+    await press(stdin, 'q');
+
+    expect(onUnselect).toHaveBeenCalledTimes(3);
+    expect(onUnselect).toHaveBeenCalledWith(threeItems[0]);
+    expect(onUnselect).toHaveBeenCalledWith(threeItems[1]);
+    expect(onUnselect).toHaveBeenCalledWith(threeItems[2]);
+  });
+
+  it('空列表时 a/q 不报错', async () => {
+    const onChange = vi.fn();
+    const { stdin } = renderControlled({
+      focusId: 'test',
+      items: [],
+      onChange,
+    });
+
+    await expect(press(stdin, 'a')).resolves.not.toThrow();
+    await expect(press(stdin, 'q')).resolves.not.toThrow();
+    // a 触发 onChange([])，q 再次触发 onChange([])
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it('a 后 q 然后 Space 选中正常', async () => {
+    const onChange = vi.fn();
+    const { stdin } = renderControlled({
+      focusId: 'test',
+      items: threeItems,
+      onChange,
+    });
+
+    await press(stdin, 'a');
+    onChange.mockClear();
+
+    await press(stdin, 'q');
+    onChange.mockClear();
+
+    await press(stdin, KEYS.space);
+    expect(onChange).toHaveBeenCalledWith(['dark']);
+  });
+});
+
 describe('回车提交', () => {
   it('Enter 触发 onSubmit，传递当前已选 values', async () => {
     const onSubmit = vi.fn();
