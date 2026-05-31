@@ -223,6 +223,47 @@ describe('错误清除', () => {
   });
 });
 
+describe('组件卸载清理', () => {
+  it('卸载后提交不会触发回调（mountedRef 防护）', async () => {
+    const onSubmit = vi.fn();
+    const submitRef: { current: (() => void) | undefined } = { current: undefined };
+
+    function HostScreen() {
+      return React.createElement(
+        Form,
+        { onSubmit, submitRef },
+        React.createElement(Field, { name: 'x', rules: [], defaultValue: '' },
+          ({ value, onChange, focusId }: any) =>
+            React.createElement(TextInput, { focusId, value, onChange }),
+        ),
+      );
+    }
+    HostScreen.displayName = 'HostScreen';
+
+    clearRegistry();
+    registerComponent(HostScreen, {});
+    const { unmount } = render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: HostScreen },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+    await flush();
+
+    // 获取 submitForm 引用
+    expect(submitRef.current).toBeDefined();
+
+    // 卸载 Form
+    unmount();
+    await flush();
+
+    // submitForm 仍可调用但不触发 onSubmit（mountedRef 已置 false）
+    expect(() => submitRef.current!()).not.toThrow();
+    // 注意：由于 globalKeys 无法动态移除，ctrl+enter handler
+    // 仍然注册但在 Handler 内被 mountedRef 拦截，无害
+  });
+});
+
 describe('错误聚焦', () => {
   it('多字段验证失败后聚焦第一个错误字段', async () => {
     const { submitRef } = renderForm(

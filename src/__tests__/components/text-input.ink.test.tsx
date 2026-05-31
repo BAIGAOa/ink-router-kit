@@ -620,6 +620,24 @@ describe('特殊键不泄漏到通配符', () => {
 });
 
 
+describe('焦点目标稳定性', () => {
+  it('连续输入字符不导致焦点目标丢失', async () => {
+    const onChange = vi.fn();
+    const { stdin } = renderTextInput({
+      focusId: 'stable-focus',
+      value: '',
+      onChange,
+    });
+
+    // 模拟多次快速输入，不抛错即焦点目标稳定
+    for (const ch of 'abcdefghij') {
+      await press(stdin, ch);
+    }
+
+    expect(onChange).toHaveBeenCalled();
+  });
+});
+
 describe('placeholder 边界', () => {
   it('空字符串 placeholder 且 value 为空时不抛错', () => {
     const { lastFrameClean } = renderTextInput({

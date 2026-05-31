@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Text } from 'ink';
 import { useKeyboard, useFocusState } from '../../keyboard/index.js';
 
@@ -22,9 +22,11 @@ export function NumberInput({
   const isFocused = useFocusState(focusId);
   const { boundKeyboard, focusUnregister } = useKeyboard();
 
-  // Focus target lifecycle — mount/unmount only, not re-created on value change
+  // Focus target lifecycle — mount/unmount only
+  const focusIdRef = useRef(focusId);
+  focusIdRef.current = focusId;
   useEffect(() => {
-    return () => focusUnregister(focusId);
+    return () => focusUnregister(focusIdRef.current);
   }, []);
 
   useEffect(() => {

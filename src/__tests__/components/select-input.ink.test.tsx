@@ -903,3 +903,30 @@ describe('非聚焦渲染（isFocused=false）', () => {
     expect(afterCount).toBe(1);
   });
 });
+
+describe('焦点目标稳定性', () => {
+  it('连续滚动不导致焦点目标丢失', async () => {
+    const onSelect = vi.fn();
+    const { stdin } = renderSelectInput({
+      focusId: 'scroll-focus',
+      items: [
+        { label: 'A', value: 'a' },
+        { label: 'B', value: 'b' },
+        { label: 'C', value: 'c' },
+      ],
+      onSelect,
+    });
+    await flush();
+
+    // 多次上下移动
+    await press(stdin, KEYS.down);
+    await press(stdin, KEYS.down);
+    await press(stdin, KEYS.up);
+    await press(stdin, KEYS.down);
+
+    // 按 Enter 仍能正常选择
+    await press(stdin, KEYS.enter);
+    await flush();
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+});
