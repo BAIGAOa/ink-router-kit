@@ -24,11 +24,9 @@ jobs:
           node-version: 22
           cache: npm
 
-      # ── 直接执行 npm install 同步 lock 文件 ──
       - name: Run npm install to sync lock file
         run: npm install
 
-      # ── 检查 lock 文件是否变了 ──
       - name: Check for changes in package-lock.json
         id: check
         run: |
@@ -37,13 +35,12 @@ jobs:
             echo "diff<<EOF" >> $GITHUB_OUTPUT
             git diff --stat -- package-lock.json >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
-            echo "::notice::📦 package-lock.json 有变更，将创建 PR"
+            echo "::notice::package-lock.json changed, PR will be created"
           else
             echo "changed=false" >> $GITHUB_OUTPUT
-            echo "::notice::✅ package-lock.json 无需更新"
+            echo "::notice::package-lock.json is up-to-date"
           fi
 
-      # ── 创建 Pull Request ──
       - name: Create Pull Request
         id: cpr
         if: steps.check.outputs.changed == 'true'
@@ -51,27 +48,25 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: 'chore: sync package-lock.json [skip ci]'
-          title: '🔄 Auto-sync: package-lock.json 已自动更新'
+          title: 'Auto-sync: package-lock.json updated'
           body: |
-            ## 自动同步 Lock 文件
+            ## Auto-sync Lock File
 
-            `package-lock.json` 与 `package.json` 不同步，已自动执行 `npm install` 修复。
+            `package-lock.json` was out of sync with `package.json`. This PR applies
+            the changes from `npm install`.
 
-            ### 变更摘要
+            ### Summary
 
             ${{ steps.check.outputs.diff }}
 
-            ### 原因
+            ### Note
 
-            检测到 `package.json` 变更后自动执行了 `npm install`，lock 文件已同步更新。
-
-            > 警告: 此 PR 由 GitHub Actions 自动创建，review 确认后合并即可。
+            This PR was automatically created by GitHub Actions. Review and merge if CI passes.
           branch: auto-sync/lockfile
           delete-branch: true
           labels: automated
 
-      # ── 输出 PR 链接 ──
       - name: Show PR link
         if: steps.cpr.outputs.pull-request-url != ''
         run: |
-          echo "::notice::🔗 PR 已创建: ${{ steps.cpr.outputs.pull-request-url }}"
+          echo "::notice::PR created: ${{ steps.cpr.outputs.pull-request-url }}"

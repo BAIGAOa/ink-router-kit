@@ -41,7 +41,7 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-      # 幂等检查：如果该版本已在 npm 上发布，则跳过
+      # Idempotency check: skip publish if version already exists on npm
       - name: Check if version exists on npm
         id: check
         run: |
@@ -49,10 +49,10 @@ jobs:
           PKG_VERSION=$(node -p "require('./package.json').version")
           if npm view "${PKG_NAME}@${PKG_VERSION}" version 2>/dev/null; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "版本 ${PKG_VERSION} 已存在，跳过发布"
+            echo "Version ${PKG_VERSION} already published, skipping"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "版本 ${PKG_VERSION} 尚未发布，继续"
+            echo "Version ${PKG_VERSION} not published, continuing"
           fi
 
       - name: Publish to npm
