@@ -155,14 +155,14 @@ export function Form({ children, onSubmit, onError, initialValues = {}, submitRe
     if (submitRef) submitRef.current = submitForm;
   }, [submitForm, submitRef]);
 
-  // Bind Ctrl+Enter to submit via globalKeys so it fires before
+  // Bind Ctrl+S to submit via globalKeys so it fires before
   // focus-target bindings (avoiding SelectInput/MultiSelectInput's
   // 'return' binding from consuming the event first).
   // Uses refs so the entry is added once and the latest submitForm
   // is always called; mountedRef prevents calling after unmount.
   useEffect(() => {
     globalKeys([
-      { key: 'ctrl+return', operate: () => { if (mountedRef.current) submitFormRef.current(); }, cover: false, affectOverlay: false },
+      { key: 'ctrl+s', operate: () => { if (mountedRef.current) submitFormRef.current(); }, cover: false, affectOverlay: false },
     ], { mode: 'add' });
     return () => { mountedRef.current = false; };
   }, []);

@@ -69,7 +69,7 @@ function FormDemo() {
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold underline>Registration Form Demo</Text>
-      <Text dimColor>Tab to switch fields · Ctrl+Enter to submit</Text>
+      <Text dimColor>Tab to switch fields · Ctrl+S to submit</Text>
 
       <Box marginTop={1}>
         <Form
@@ -202,7 +202,7 @@ function FormDemo() {
 
       <KeyHint keys={[
         { key: 'Tab', desc: 'Next field' },
-        { key: 'Ctrl+Enter', desc: 'Submit' },
+        { key: 'Ctrl+S', desc: 'Submit' },
         { key: 'q', desc: 'Quit' },
       ]} />
     </Box>
