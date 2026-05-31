@@ -112,6 +112,11 @@ export function SelectInput<T, I extends Item<T> = Item<T>>({
     [hasLimit, items.length, limit, scrollOffset],
   );
 
+  // Focus target lifecycle — mount/unmount only
+  useEffect(() => {
+    return () => focusUnregister(focusId);
+  }, []);
+
   useEffect(() => {
     const fid = focusId;
 
@@ -138,12 +143,10 @@ export function SelectInput<T, I extends Item<T> = Item<T>>({
       unDown();
       unReturn();
       numUnbinds.forEach((fn) => fn());
-      focusUnregister(fid);
     };
   }, [
     focusId,
     boundKeyboard,
-    focusUnregister,
     moveHighlight,
     visibleItems.length,
   ]);

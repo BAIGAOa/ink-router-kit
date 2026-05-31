@@ -179,6 +179,11 @@ export function TextInput({
     [originalValue, cursorOffset, onChange, highlightPastedText],
   );
 
+  // 焦点目标生命周期 — 挂载/卸载时注册/注销，不随值变化重建
+  useEffect(() => {
+    return () => focusUnregister(focusId);
+  }, []);
+
   // 注册键盘绑定（仅在获得焦点时生效）
   useEffect(() => {
     const fid = focusId;
@@ -208,15 +213,13 @@ export function TextInput({
       boundKeyboard(['*'], (input) => modifyText(input), { focusId: fid }),
     );
 
-    // 清理：解绑所有键盘回调，并从焦点系统中注销此焦点目标
+    // 清理：解绑所有键盘回调（焦点目标生命周期由独立 effect 管理）
     return () => {
       unbindList.forEach((fn) => fn());
-      focusUnregister(fid);
     };
   }, [
     focusId,
     boundKeyboard,
-    focusUnregister,
     moveCursor,
     modifyText,
     onSubmit,

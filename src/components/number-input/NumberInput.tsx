@@ -22,6 +22,11 @@ export function NumberInput({
   const isFocused = useFocusState(focusId);
   const { boundKeyboard, focusUnregister } = useKeyboard();
 
+  // Focus target lifecycle — mount/unmount only, not re-created on value change
+  useEffect(() => {
+    return () => focusUnregister(focusId);
+  }, []);
+
   useEffect(() => {
     const up = boundKeyboard(['up', 'right'], () => {
       const next = Math.min(value + step, max);
@@ -49,7 +54,6 @@ export function NumberInput({
       up();
       down();
       wildcard();
-      focusUnregister(focusId);
     };
   }, [focusId, value, min, max, step, onChange]);
 
