@@ -31,6 +31,58 @@ npm run clean       # rm -rf dist
 - Navigation functions (`skip`, `back`, `gotoScreen`, `overlay`, `closeOverlay`) work both as hooks and module-level imports via `_dispatch` ref
 - `KeyboardProvider` MUST be nested inside `ScenarioManagementProvider`
 
+## Coding Conventions
+
+### Focus target lifecycle
+Separate `focusUnregister` from the keyboard binding `useEffect`. The binding effect may re-run on value changes; `focusUnregister` should only run on unmount.
+
+```tsx
+const focusIdRef = useRef(focusId);
+focusIdRef.current = focusId;
+useEffect(() => {
+  return () => focusUnregister(focusIdRef.current);
+}, []); // mount/unmount only
+
+useEffect(() => {
+  // boundKeyboard(...)
+  return () => { /* unbind keyboard handlers only */ };
+}, [value, /* ... */]);
+```
+
+### Callback refs in empty-deps effects
+When a `useEffect` has `[]` deps, capture callbacks via `useRef` to avoid stale closures.
+
+```tsx
+const onCancelRef = useRef(onCancel);
+onCancelRef.current = onCancel;
+useEffect(() => {
+  return boundKeyboard(['escape'], () => onCancelRef.current());
+}, []);
+```
+
+### Defaults for prop accessors
+All props whose values are accessed via `.length` / `.map()` / etc. must have a runtime default.
+
+```tsx
+function KeyHint({ keys = [] }: Props) { ... }
+function TextInput({ value = '' }: Props) { ... }
+```
+
+### globalKeys mode
+Use `{ mode: 'add' }` when registering global keys alongside other consumers. Default (replace) silently deletes entries from other components.
+
+```tsx
+globalKeys([{ key: 'ctrl+s', operate: handleSubmit }], { mode: 'add' });
+```
+
+### Mount guard for async operations
+Use a `mountedRef` to prevent callbacks from running after unmount.
+
+```tsx
+const mountedRef = useRef(true);
+useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+```
+
 ## Watch out for
 - `blockedKey` means "pass-through" (penetration), NOT "block" — makes keys transparent to lower layers
 - `_dispatch` is set in `useEffect` — not available during `componentDidCatch`. If an error boundary calls `overlay()` in `componentDidCatch`, `_dispatch` is `null`
