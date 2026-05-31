@@ -24,7 +24,7 @@ npm run clean       # rm -rf dist
 ```
 
 ## Conventions
-- Components use `React.createElement`, not JSX (avoids JSX transform dependency)
+- Components use **JSX** syntax. `React.createElement` in existing code is a historical legacy from before the project adopted JSX — do NOT use it for new components.
 - Tests under `src/__tests__/` — `*.ink.test.ts(x)` runs in node env, `*.test.ts(x)` in jsdom
 - `registerComponent()` required before any screen appears in a provider tree
 - `clearRegistry()` in test `beforeEach` — registry is a module-level Map
