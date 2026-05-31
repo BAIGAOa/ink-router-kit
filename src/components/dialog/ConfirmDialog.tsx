@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { useKeyboard, useFocusState } from '../../keyboard/hook.js';
 import type { ConfirmDialogProps } from './types.js';
@@ -35,21 +35,25 @@ export function ConfirmDialog({
   const confirmFocused = useFocusState('dialog-confirm');
   const cancelFocused = useFocusState('dialog-cancel');
 
+  // Keep stable refs so the keyboard effect doesn't capture stale callbacks
+  const onConfirmRef = useRef(onConfirm);
+  onConfirmRef.current = onConfirm;
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
+
   useEffect(() => {
     // Esc 在任何按钮上都是取消（屏幕级绑定，不受 focus 影响）
-    const unEsc = boundKeyboard(['escape'], onCancel);
+    const unEsc = boundKeyboard(['escape'], () => onCancelRef.current());
 
-    
     const unConfirm = boundKeyboard(
       ['return'],
-      onConfirm,
+      () => onConfirmRef.current(),
       { focusId: 'dialog-confirm' },
     );
 
-
     const unCancel = boundKeyboard(
       ['return'],
-      onCancel,
+      () => onCancelRef.current(),
       { focusId: 'dialog-cancel' },
     );
 
