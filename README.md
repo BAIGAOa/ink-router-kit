@@ -123,6 +123,7 @@ Every API provides full TypeScript type inference. Functions like `skip`, `gotoS
 
 ### Navigation
 - **[Tabs](src/components/tabs/README.md)** — Tabbed panel with keyboard navigation and focus system integration
+- **[Fold](src/components/fold/README.md)** — Collapsible panel with preview and Space-toggle, integrated with focus system
 
 ### Layout
 - **[Divider](src/components/divider/README.md)** — Horizontal separator with optional centered label
