@@ -1,6 +1,6 @@
 {
     "name": "@baigao_h/ink-kit",
-    "version": "2.2.0",
+    "version": "2.3.0",
 
     "description": "Ready-to-use Ink components and screen management system for building terminal UIs.",
     "type": "module",
