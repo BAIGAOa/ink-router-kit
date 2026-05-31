@@ -6,6 +6,7 @@ export {
   gotoScreen,
   overlay,
   closeOverlay,
+  clearDispatchers,
 } from './provider.js';
 export type { ScenarioManagementProviderProps } from './provider.js';
 export { useScreenSystem } from './hook.js';

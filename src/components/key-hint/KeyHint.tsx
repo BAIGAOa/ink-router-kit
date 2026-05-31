@@ -10,7 +10,7 @@ interface KeyHintProps {
   keys: HintEntry[];
 }
 
-export function KeyHint({ keys }: KeyHintProps) {
+export function KeyHint({ keys = [] }: KeyHintProps) {
   return (
     <Box gap={2}>
       {keys.map(({ key, desc }) => (

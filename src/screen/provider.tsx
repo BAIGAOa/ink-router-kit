@@ -21,6 +21,16 @@ import {
 
 const _dispatchers = new Set<React.Dispatch<ScreenAction>>();
 
+/**
+ * Clear all registered provider dispatchers.
+ * Intended for test cleanup — prevents stale dispatch references
+ * from leaking between test runs when providers are not properly
+ * unmounted.
+ */
+export function clearDispatchers(): void {
+  _dispatchers.clear();
+}
+
 function getDispatch(): React.Dispatch<ScreenAction> {
   if (_dispatchers.size === 0) {
     throw new Error(
