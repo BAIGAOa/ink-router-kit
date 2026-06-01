@@ -1,0 +1,12 @@
+{
+  "title": "主菜单",
+  "play": "开始游戏",
+  "settings": "设置",
+  "quit": "退出",
+  "game": {
+    "info": "第{level}关 - 分数: {score}",
+    "back": "返回"
+  },
+  "player": "玩家年龄为{age}",
+  "inventory": "你有{count}个物品"
+}

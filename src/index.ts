@@ -99,3 +99,8 @@ export type {
   FormContextValue,
   Validator,
 } from "./components/form/types.js";
+
+// I18n — Language
+export { LanguageProvider } from "./language/index.js";
+export { useI18n } from "./language/index.js";
+export type { LanguageProviderProps, I18nContextValue } from "./language/index.js";

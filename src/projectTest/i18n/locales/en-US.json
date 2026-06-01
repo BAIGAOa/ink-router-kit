@@ -1,0 +1,12 @@
+{
+  "title": "Main Menu",
+  "play": "Play Game",
+  "settings": "Settings",
+  "quit": "Quit",
+  "game": {
+    "info": "Level {level} - Score: {score}",
+    "back": "Back"
+  },
+  "player": "Player aged {age}",
+  "inventory": "You have {count} items"
+}
