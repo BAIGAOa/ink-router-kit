@@ -489,10 +489,13 @@ describe('focusSet / focusNext / focusPrev / focusCurrent', () => {
     expect(getKeyboard()!.focusCurrent()).toBe('two');
   });
 
-  it('focusSet 对不存在的 focusId 无操作', () => {
+  it('focusSet 对不存在的 focusId 抛出运行时错误', () => {
     const { getKeyboard } = renderKeyboardTree(Menu);
     getKeyboard()!.boundKeyboard(['a'], () => {}, { focusId: 'one' });
-    getKeyboard()!.focusSet('nonexistent');
+
+    expect(() => getKeyboard()!.focusSet('nonexistent'))
+      .toThrow(/focus target not found/);
+    // 当前焦点不受影响
     expect(getKeyboard()!.focusCurrent()).toBe('one');
   });
 

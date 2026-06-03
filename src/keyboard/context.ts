@@ -90,10 +90,12 @@ export interface KeyboardContextValue {
   /**
    * Activate a specific focus target by its id.
    *
-   * No-op if no focus target with the given id exists on the current
-   * screen layer.
+   * Throws a runtime error if the current screen has no keyboard layer
+   * or no focus target with the given id is registered.
    *
    * @param focusId  The focus target id to activate.
+   * @throws If the current screen has no keyboard layer or the focus
+   *         target does not exist.
    */
   focusSet: (focusId: string) => void;
 

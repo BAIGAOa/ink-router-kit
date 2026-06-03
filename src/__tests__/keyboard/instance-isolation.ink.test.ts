@@ -100,14 +100,15 @@ describe('两个 KeyboardProvider 实例完全隔离', () => {
     b.unmount();
   });
 
-  it('实例 A 注册的 focus target 在实例 B 中不存在', () => {
+  it('实例 A 注册的 focus target 在实例 B 中不存在，应抛出错误', () => {
     const a = renderIsolatedProvider();
     const b = renderIsolatedProvider();
 
     a.kb().boundKeyboard(['return'], () => {}, { focusId: 'btn-a' });
 
     expect(b.kb().focusCurrent()).toBeNull();
-    b.kb().focusSet('btn-a');
+    expect(() => b.kb().focusSet('btn-a'))
+      .toThrow(/focus target not found.*btn-a|no keyboard layer found/);
     expect(b.kb().focusCurrent()).toBeNull();
 
     a.unmount();

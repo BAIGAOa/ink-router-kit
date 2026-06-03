@@ -654,8 +654,23 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     (focusId: string) => {
       const owner = getCurrentOwner();
       if (!owner) return;
+      const ownerName = (owner as any).displayName || owner.name || 'Unknown';
       const layer = layersRef.current.get(owner);
-      if (!layer || !layer.focusTargets.has(focusId)) return;
+      if (!layer) {
+        throw new Error(
+          `focusSet("${focusId}"): no keyboard layer found for screen "${ownerName}". ` +
+          `Did you forget to wrap the screen in <KeyboardProvider>?`,
+        );
+      }
+      if (!layer.focusTargets.has(focusId)) {
+        const available = layer.focusOrder.length > 0
+          ? layer.focusOrder.map(id => `"${id}"`).join(', ')
+          : '(none)';
+        throw new Error(
+          `focusSet("${focusId}"): focus target not found on screen "${ownerName}". ` +
+          `Available targets: ${available}`,
+        );
+      }
       if (layer.currentFocusId !== focusId) {
         layer.currentFocusId = focusId;
         notifyFocusChange();
