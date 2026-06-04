@@ -2,13 +2,29 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { makeLanguageType } from './makeLanguageType.js';
 
 const args = process.argv.slice(2);
+const subcommand = args[0];
 
-if (args[0] !== 'init') {
-  console.log('Usage: npx ink-kit init <project-name>');
-  process.exit(1);
+function printHelp(): void {
+  console.log('');
+  console.log('  ink-kit init <project-name>              Scaffold a new project');
+  console.log('  ink-kit makeLanguageType <source> <out>   Generate typed i18n bindings');
+  console.log('');
+  console.log('Options for makeLanguageType:');
+  console.log('  --watch          Re-generate on every file change');
+  console.log('  --debounce <ms>  Debounce delay (default 500)');
+  console.log('  --from <pkg>     Package name to import from (default @baigao_h/ink-kit)');
+  console.log('');
 }
+
+if (!subcommand || subcommand === '--help' || subcommand === '-h') {
+  printHelp();
+  process.exit(subcommand ? 0 : 1);
+}
+
+if (subcommand === 'init') {
 
 const projectName = args[1];
 if (!projectName) {
@@ -26,8 +42,6 @@ if (fs.existsSync(root)) {
 console.log(`Creating ink-kit project: ${projectName}`);
 
 fs.mkdirSync(path.join(root, 'src'), { recursive: true });
-
-// ── package.json ─────────────────────────────────────────
 
 const pkg = {
   name: projectName,
@@ -58,8 +72,6 @@ fs.writeFileSync(
   JSON.stringify(pkg, null, 2) + '\n',
 );
 
-// ── tsconfig.json ────────────────────────────────────────
-
 const tsconfig = {
   compilerOptions: {
     target: 'ES2022',
@@ -82,8 +94,6 @@ fs.writeFileSync(
   path.join(root, 'tsconfig.json'),
   JSON.stringify(tsconfig, null, 2) + '\n',
 );
-
-// ── src/index.tsx ────────────────────────────────────────
 
 const entry = `import React from 'react';
 import { Box, Text, render } from 'ink';
@@ -148,8 +158,6 @@ render(
 
 fs.writeFileSync(path.join(root, 'src', 'index.tsx'), entry);
 
-// ── npm install ─────────────────────────────────────────
-
 console.log('Installing dependencies...');
 const result = spawnSync('npm', ['install'], { cwd: root, stdio: 'inherit' });
 
@@ -161,3 +169,42 @@ if (result.status !== 0) {
 console.log('\nDone! Run:');
 console.log(`  cd ${projectName}`);
 console.log('  npm start');
+}
+
+/* ── makeLanguageType ── */
+
+if (subcommand === 'makeLanguageType') {
+  const sourceDir = args[1];
+  const outputDir = args[2];
+
+  if (!sourceDir || !outputDir) {
+    console.error('Error: ink-kit makeLanguageType <source-dir> <output-dir> [options]');
+    process.exit(1);
+  }
+
+  const watch = args.includes('--watch');
+  const debounceIndex = args.indexOf('--debounce');
+  const debounceMs = debounceIndex !== -1 ? parseInt(args[debounceIndex + 1], 10) : 500;
+  const fromIndex = args.indexOf('--from');
+  const packageName = fromIndex !== -1 ? args[fromIndex + 1] : '@baigao_h/ink-kit';
+
+  if (isNaN(debounceMs) || debounceMs < 0) {
+    console.error('Error: --debounce must be a non-negative number');
+    process.exit(1);
+  }
+
+  makeLanguageType({
+    sourceDir: path.resolve(sourceDir),
+    outputDir: path.resolve(outputDir),
+    watch,
+    debounceMs,
+    packageName,
+  });
+  process.exit(0);
+}
+
+/* ── unknown subcommand ── */
+
+console.error(`Error: unknown subcommand "${subcommand}"`);
+printHelp();
+process.exit(1);
