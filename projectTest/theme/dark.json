@@ -1,0 +1,12 @@
+{
+  "id": "dark",
+  "primary": "cyan",
+  "bg": "black",
+  "muted": "gray",
+  "danger": "red",
+  "success": "green",
+  "border": "gray",
+  "titleBold": true,
+  "textDim": false,
+  "borderBold": false
+}

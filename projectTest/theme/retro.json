@@ -1,0 +1,12 @@
+{
+  "id": "retro",
+  "primary": "yellow",
+  "bg": "black",
+  "muted": "gray",
+  "danger": "red",
+  "success": "greenBright",
+  "border": "yellow",
+  "titleBold": true,
+  "textDim": false,
+  "borderBold": true
+}
