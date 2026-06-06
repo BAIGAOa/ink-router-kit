@@ -44,9 +44,18 @@ export function registerComponent<C extends React.ComponentType<any>>(
   // 如果声明了父节点，将自己添加到父节点的 children 中
   if (options?.parent) {
     const parentEntry = registry.get(options.parent);
-    if (parentEntry) {
-      parentEntry.children.add(component);
+    if (!parentEntry) {
+      const compName = component.displayName || component.name || "anonymous";
+      const parentName =
+        (options.parent as any).displayName ||
+        (options.parent as any).name ||
+        "anonymous";
+      throw new Error(
+        `[Ink-Router-Kit] registerComponent("${compName}"): parent component "${parentName}" is not registered. ` +
+        `Register the parent first with registerComponent(${parentName}, template).`,
+      );
     }
+    parentEntry.children.add(component);
   }
 }
 
