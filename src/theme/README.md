@@ -107,6 +107,7 @@ const {
   themes,
   setTheme,
   mergeTheme,
+  addThemes,
 } = useTheme();
 ```
 
@@ -192,6 +193,65 @@ mergeTheme(['./mod-a', './mod-b']);
 - Useful for game modding, where mods can overlay their own theme values on top of base themes.
 - Triggers re-render of all consumers.
 - Works with both `path`-mode and `themes`-mode providers.
+
+#### addThemes
+
+```tsx
+addThemes(paths: string[]): void
+```
+
+Add new themes from one or more directory paths. Unlike `mergeTheme`, this adds **brand new** themes to the pool rather than updating existing ones.
+
+```tsx
+addThemes(['./expansion', './dlc-themes']);
+```
+
+**Edge case behavior:**
+
+| Scenario | Behavior |
+|----------|----------|
+| Same filename in multiple paths | Later path overwrites earlier (filename-based dedup) |
+| Same id as an existing base theme | Throws immediately — use `mergeTheme` to update existing themes |
+| Different filenames with the same id within the batch | Throws — theme ids must be unique |
+| Missing keys vs. existing themes | Throws — all themes must have identical key sets |
+| Extra keys vs. existing themes | Throws — all themes must have identical key sets |
+| Empty base (no themes loaded yet) | All keys accepted; the first added theme defines the key set |
+
+- Triggers re-render of all consumers.
+- Works with both `path`-mode and `themes`-mode providers.
+- Added themes can later be merged via `mergeTheme` like any base theme.
+- No theme is auto-selected when adding into an empty provider; call `setTheme()` explicitly.
+
+**Example: adding a DLC theme pack**
+
+```tsx
+function Game() {
+  const { addThemes, setTheme, themes } = useTheme();
+
+  useEffect(() => {
+    // DLC pack provides brand new themes that don't exist in base
+    addThemes(['./dlc/cyberpunk-themes']);
+  }, []);
+
+  return (
+    <Box>
+      {themes.map(id => (
+        <Text key={id} onPress={() => setTheme(id)}>{id}</Text>
+      ))}
+    </Box>
+  );
+}
+```
+
+The DLC pack directory might contain:
+
+```
+./dlc/cyberpunk-themes/
+├── neon.json        → { "id": "neon", "primary": "magenta", "bg": "#0a0a2e", "titleBold": true }
+└── matrix.json      → { "id": "matrix", "primary": "green", "bg": "black", "titleBold": false }
+```
+
+Both must have keys identical to the base themes (`primary`, `bg`, `titleBold`).
 
 #### themeId
 

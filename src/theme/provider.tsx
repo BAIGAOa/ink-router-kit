@@ -89,6 +89,75 @@ function loadFromPath(dirPath: string): ThemeDefinition[] {
 }
 
 /**
+ * Load themes from multiple directory paths with filename-based deduplication.
+ *
+ * Processes paths in order — later paths override earlier ones when the
+ * same filename appears in multiple directories (within the batch).
+ *
+ * Returns the deduplicated list of ThemeDefinitions.
+ */
+function loadFromPaths(paths: string[]): ThemeDefinition[] {
+  // Map: filename → ThemeDefinition. Same filename → later overwrites earlier.
+  const fileMap = new Map<string, ThemeDefinition>();
+
+  for (const dirPath of paths) {
+    let files: string[];
+    try {
+      files = readdirSync(dirPath);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `[Ink-Router-Kit] ThemeProvider failed to read directory "${dirPath}": ${msg}`,
+      );
+    }
+
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+
+      const fullPath = resolve(dirPath, file);
+      let raw: string;
+      try {
+        raw = readFileSync(fullPath, 'utf-8');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `[Ink-Router-Kit] ThemeProvider failed to read "${fullPath}": ${msg}`,
+        );
+      }
+
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(raw) as Record<string, unknown>;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `[Ink-Router-Kit] ThemeProvider failed to parse "${file}": ${msg}`,
+        );
+      }
+
+      if (typeof parsed.id !== 'string') {
+        throw new Error(
+          `[Ink-Router-Kit] Theme file "${file}" is missing a required "id" field (string).`,
+        );
+      }
+
+      const theme: ThemeDefinition = { id: parsed.id };
+      for (const [k, v] of Object.entries(parsed)) {
+        if (k === 'id') continue;
+        if (typeof v === 'string' || typeof v === 'boolean') {
+          theme[k] = v;
+        }
+      }
+
+      // Filename dedup: later paths win for same filename
+      fileMap.set(file, theme);
+    }
+  }
+
+  return Array.from(fileMap.values());
+}
+
+/**
  * Context provider for theming.
  *
  * Loads theme definitions either from a directory of `{id}.json` files
@@ -198,6 +267,104 @@ export function ThemeProvider({
     [mergedThemes, rawThemes],
   );
 
+  // ── addThemes ────────────────────────────────────────────────
+  const addThemes = useCallback(
+    (paths: string[]) => {
+      const base = mergedThemes ?? rawThemes;
+      const existingIds = new Set(base.map((t) => t.id));
+
+      // Load from all paths with filename-based dedup
+      const incoming = loadFromPaths(paths);
+
+      // Detect id conflicts within the incoming batch (different filenames
+      // claiming the same id — filename dedup already resolved same-file cases).
+      // Re-scan all files to build a mapping of id → [source filenames],
+      // then flag any id claimed by more than one filename.
+      const idSourceFiles = new Map<string, string[]>(); // id → [filenames]
+      for (const dirPath of paths) {
+        let files: string[];
+        try {
+          files = readdirSync(dirPath);
+        } catch {
+          continue; // loadFromPaths already validates, should not reach here
+        }
+        for (const file of files) {
+          if (!file.endsWith('.json')) continue;
+          const fullPath = resolve(dirPath, file);
+          let parsed: Record<string, unknown>;
+          try {
+            parsed = JSON.parse(readFileSync(fullPath, 'utf-8')) as Record<string, unknown>;
+          } catch {
+            continue;
+          }
+          if (typeof parsed.id !== 'string') continue;
+          if (!idSourceFiles.has(parsed.id)) {
+            idSourceFiles.set(parsed.id, []);
+          }
+          const list = idSourceFiles.get(parsed.id)!;
+          if (!list.includes(file)) {
+            list.push(file);
+          }
+        }
+      }
+
+      // Check: same id claimed by multiple filenames → error
+      for (const [id, filenames] of idSourceFiles) {
+        if (filenames.length > 1) {
+          throw new Error(
+            `[Ink-Router-Kit] addThemes detected duplicate theme id "${id}" ` +
+            `in files: ${filenames.join(', ')}. Theme ids must be unique.`,
+          );
+        }
+      }
+
+      // Expected key set from existing themes
+      const expectedKeys =
+        base.length > 0
+          ? Object.keys(base[0]).filter((k) => k !== 'id')
+          : [];
+
+      // Validate each incoming theme
+      for (const theme of incoming) {
+        // Id conflict with base → error
+        if (existingIds.has(theme.id)) {
+          throw new Error(
+            `[Ink-Router-Kit] addThemes cannot add theme "${theme.id}" ` +
+            `because a theme with this id already exists. ` +
+            `Use mergeTheme() to update existing themes.`,
+          );
+        }
+
+        // Only validate keys if we have a reference set
+        if (expectedKeys.length > 0) {
+          const incKeys = Object.keys(theme).filter((k) => k !== 'id');
+          const missing = expectedKeys.filter((k) => !incKeys.includes(k));
+          const extra = incKeys.filter((k) => !expectedKeys.includes(k));
+
+          const details: string[] = [];
+          if (missing.length > 0) details.push(`missing: ${missing.join(', ')}`);
+          if (extra.length > 0) details.push(`extra: ${extra.join(', ')}`);
+
+          if (details.length > 0) {
+            throw new Error(
+              `[Ink-Router-Kit] addThemes theme "${theme.id}" has mismatched keys. ` +
+              `All themes must have identical keys (excluding 'id'). ${details.join('; ')}`,
+            );
+          }
+        }
+
+        existingIds.add(theme.id);
+      }
+
+      if (incoming.length > 0) {
+        const combined = [...base, ...incoming];
+        extractKeys(combined); // final safety check
+        setMergedThemes(combined);
+      }
+    },
+    [mergedThemes, rawThemes],
+  );
+
   const ctx: ThemeContextValue = useMemo(
     () => ({
       color,
@@ -206,8 +373,9 @@ export function ThemeProvider({
       themes: themeIds,
       setTheme,
       mergeTheme,
+      addThemes,
     }),
-    [color, style, currentThemeId, themeIds, setTheme, mergeTheme],
+    [color, style, currentThemeId, themeIds, setTheme, mergeTheme, addThemes],
   );
 
   return <ThemeContext.Provider value={ctx}>{children}</ThemeContext.Provider>;

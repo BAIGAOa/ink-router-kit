@@ -47,6 +47,18 @@ export interface ThemeContextValue {
   /**
    * Merge additional theme files from one or more directory paths.
    * Later paths override earlier paths for matching keys.
+   * Only themes whose id already exists are merged; new ids are ignored.
    */
   mergeTheme: (paths: string[]) => void;
+
+  /**
+   * Add new themes from one or more directory paths.
+   *
+   * Unlike {@link mergeTheme}, this adds **new** themes to the pool.
+   * - Same filename across paths → later overwrites earlier.
+   * - Same id as existing base theme → throws immediately.
+   * - Same id across different filenames within the batch → throws.
+   * - Missing or extra keys vs. existing themes → throws.
+   */
+  addThemes: (paths: string[]) => void;
 }
