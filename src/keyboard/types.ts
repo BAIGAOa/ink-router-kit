@@ -39,6 +39,25 @@ export interface BoundKeyboardOptions {
    * Useful for one-shot key bindings (e.g. "press any key to continue").
    */
   once?: boolean;
+
+  /**
+   * Number of times the bound key(s) must be pressed before the handler
+   * fires. Defaults to `undefined` (fire immediately on every press).
+   *
+   * The counter is per-binding (all keys in the `keys` array share the
+   * same counter) and never auto-resets. When the counter reaches
+   * `times`, the handler fires and the counter resets to 0.
+   *
+   * When combined with `once: true`, the binding is removed after the
+   * handler fires (i.e. after `times` presses).
+   *
+   * Must be >= 1. Throws if 0 or negative.
+   *
+   * Examples:
+   * - `times: 2` → handler fires on the 2nd, 4th, 6th… press.
+   * - `times: 3, once: true` → handler fires on the 3rd press and unbinds.
+   */
+  times?: number;
 }
 
 /**
@@ -53,6 +72,10 @@ export interface BoundKeyEntry {
   onlyThis: boolean;
   /** The screen component that owns this binding. */
   owner: React.ComponentType<any>;
+  /** Number of presses needed before the handler fires (from options). */
+  times?: number;
+  /** Current press count. Managed internally by the keyboard provider. */
+  pressCount?: number;
 }
 
 /**

@@ -467,6 +467,14 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           '[Ink-Router-Kit] boundKeyboard() must be called inside a screen component. There is currently no active screen.',
         );
       }
+
+      // 校验 times 参数
+      if (options?.times !== undefined && options.times < 1) {
+        throw new Error(
+          '[Ink-Router-Kit] boundKeyboard() times option must be >= 1.',
+        );
+      }
+
       const layer = getLayer(owner);
 
       if (options?.focusId) {
@@ -498,7 +506,23 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           }
         };
 
-        if (options?.once) {
+        // Apply times and/or once wrappers
+        if (options?.times !== undefined && options.times >= 1) {
+          entry.times = options.times;
+          entry.pressCount = 0;
+          const originalHandler = entry.handler;
+          entry.handler = (input: string, key: Key) => {
+            entry.pressCount! += 1;
+            if (entry.pressCount! < entry.times!) {
+              return; // consume event, don't fire handler yet
+            }
+            entry.pressCount = 0; // reset counter
+            if (options?.once) {
+              doUnbind();
+            }
+            originalHandler(input, key);
+          };
+        } else if (options?.once) {
           const originalHandler = entry.handler;
           entry.handler = (input: string, key: Key) => {
             doUnbind();
@@ -534,7 +558,23 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         }
       };
 
-      if (options?.once) {
+      // Apply times and/or once wrappers
+      if (options?.times !== undefined && options.times >= 1) {
+        entry.times = options.times;
+        entry.pressCount = 0;
+        const originalHandler = entry.handler;
+        entry.handler = (input: string, key: Key) => {
+          entry.pressCount! += 1;
+          if (entry.pressCount! < entry.times!) {
+            return; // consume event, don't fire handler yet
+          }
+          entry.pressCount = 0; // reset counter
+          if (options?.once) {
+            doUnbind();
+          }
+          originalHandler(input, key);
+        };
+      } else if (options?.once) {
         const originalHandler = entry.handler;
         entry.handler = (input: string, key: Key) => {
           doUnbind();
