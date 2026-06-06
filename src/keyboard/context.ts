@@ -146,6 +146,27 @@ export interface KeyboardContextValue {
 	 	*/
   defineShortcutAction: (entries: ShortcutOperationEntry[]) => void;
   /**
+   * Dynamically register a single shortcut action.
+   *
+   * @param entry - The shortcut operation definition to add.
+   * @throws {Error} If an action with the same `actionId` already exists.
+   */
+  addAction: (entry: ShortcutOperationEntry) => void;
+  /**
+   * Check whether a shortcut action with the given id exists.
+   *
+   * @param actionId - The action id to look up.
+   * @returns `true` if the action is registered, `false` otherwise.
+   */
+  hasAction: (actionId: string) => boolean;
+  /**
+   * Remove a registered shortcut action.
+   *
+   * @param actionId - The action id to remove.
+   * @throws {Error} If no action with the given id exists.
+   */
+  removeAction: (actionId: string) => void;
+  /**
    * Modify the default keys of an existing shortcut action.
    *
    * @param actionId - The unique identifier of the action.

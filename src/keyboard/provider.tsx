@@ -872,6 +872,27 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     entry.keys = keys;
   }, []);
 
+    const addAction = useCallback((entry: ShortcutOperationEntry) => {
+    if (shortcutOperationsRef.current.has(entry.actionId)) {
+      throw new Error(`[Ink-Router-Kit] Duplicate shortcut cannot be defined with ID ${entry.actionId}`);
+    }
+    shortcutOperationsRef.current.set(entry.actionId, {
+      action: entry.action,
+      keys: entry.keys,
+    });
+  }, []);
+
+  const hasAction = useCallback((actionId: string): boolean => {
+    return shortcutOperationsRef.current.has(actionId);
+  }, []);
+
+  const removeAction = useCallback((actionId: string) => {
+    if (!shortcutOperationsRef.current.has(actionId)) {
+      throw new Error(`[Ink-Router-Kit] Cannot remove action "${actionId}": action not registered.`);
+    }
+    shortcutOperationsRef.current.delete(actionId);
+  }, []);
+
   const clearShortcutOperations = useCallback(() => {
     shortcutOperationsRef.current.clear();
   }, []);
@@ -889,6 +910,9 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       focusUnregister,
       subscribeFocus,
       defineShortcutAction,
+      addAction,
+      hasAction,
+      removeAction,
       modifyAction,
       clearShortcutOperations,
     }),
@@ -904,6 +928,9 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       focusUnregister,
       subscribeFocus,
       defineShortcutAction,
+      addAction,
+      hasAction,
+      removeAction,
       modifyAction,
       clearShortcutOperations,
     ],
