@@ -93,3 +93,5 @@ export type { BinaryStorageOptions, BinaryStorageAPI };
  * storage files outside the normal read/write API.
  */
 export { TypeTag, TAG_NAMES } from './types.js';
+export { createStreamingReader, StreamCorruptError } from './StreamingReader.js';
+export type { StreamingReaderOptions, StreamingReaderAPI } from './types.js';

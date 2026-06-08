@@ -87,6 +87,98 @@ export const enum TypeTag {
 }
 
 /**
+ * Options for {@link createStreamingReader}.
+ *
+ * All properties are optional — defaults are tuned for large files
+ * (1 GB+) with a 50 MB memory budget.
+ */
+export interface StreamingReaderOptions {
+  /**
+   * Maximum number of parsed values to buffer in the internal queue
+   * before pausing the underlying file stream (backpressure).
+   *
+   * @default 1000
+   */
+  maxQueueSize?: number;
+
+  /**
+   * Passed through to `fs.createReadStream` as `highWaterMark`.
+   *
+   * This controls the size (in bytes) of each chunk read from disk.
+   * Larger values reduce `fs.read` syscall count but increase
+   * per-chunk memory. The default 64 KiB balances both.
+   *
+   * @default 65536  (64 KiB)
+   */
+  highWaterMark?: number;
+}
+
+/**
+ * The streaming reader API returned by {@link createStreamingReader}.
+ *
+ * Unlike {@link BinaryStorageAPI} (which loads the entire file into
+ * memory), this reads values sequentially from disk via a Node.js
+ * `ReadStream`. Values are parsed one at a time and returned in
+ * complete batches — the user never sees partial / truncated data.
+ *
+ * ## Lifecycle
+ *
+ * 1. Call `createStreamingReader(filePath, options?)` to open the file.
+ * 2. Use `readBatch(count)` for manual batching or `for await` for
+ *    per-value iteration.
+ * 3. Call `destroy()` when done (or let the async iterator finish).
+ *
+ * The underlying file stream is automatically closed on end-of-file
+ * or error. Calling `destroy()` is idempotent and safe from any
+ * state.
+ */
+export interface StreamingReaderAPI {
+  /**
+   * Read up to `count` complete values from the file.
+   *
+   * Returns fewer than `count` values only when the file has been
+   * fully consumed. The returned array is empty (`[]`) when there is
+   * no more data.
+   *
+   * Each element in the array is a fully decoded value — you never
+   * need to handle partial bytes or incomplete records.
+   *
+   * @param count — Maximum number of values to return.
+   * @returns An array of decoded values (number, string, boolean,
+   *          object, array, or null), or `[]` at end-of-stream.
+   * @throws If the file is corrupt (unknown tag, truncated payload).
+   */
+  readBatch(count: number): Promise<unknown[]>;
+
+  /**
+   * Close the underlying file stream and release all resources.
+   *
+   * After calling `destroy()`:
+   * - Any pending `readBatch()` call is rejected.
+   * - The async iterator stops immediately.
+   * - The file descriptor is closed — no leak.
+   *
+   * Idempotent: calling `destroy()` multiple times is safe.
+   */
+  destroy(): void;
+
+  /**
+   * Async iterable protocol — iterate over every value one by one.
+   *
+   * ```ts
+   * for await (const value of reader) {
+   *   console.log(value);
+   * }
+   * ```
+   *
+   * The iteration ends naturally when the file is fully consumed.
+   * Errors (corruption, truncation) are thrown inside the loop body
+   * and stop the iterator.
+   */
+  [Symbol.asyncIterator](): AsyncIterator<unknown>;
+}
+
+/**
  * Human-readable name for each type tag.
  *
  * Used in error messages so that instead of

@@ -117,3 +117,7 @@ export type { StorageOptions, StorageAPI } from "./storage/index.js";
 // Binary Persistence System
 export { createBinaryStorage, TypeTag, TAG_NAMES } from "./binary-storage/index.js";
 export type { BinaryStorageOptions, BinaryStorageAPI } from "./binary-storage/index.js";
+
+// Binary Streaming Reader
+export { createStreamingReader, StreamCorruptError } from "./binary-storage/StreamingReader.js";
+export type { StreamingReaderOptions, StreamingReaderAPI } from "./binary-storage/StreamingReader.js";
