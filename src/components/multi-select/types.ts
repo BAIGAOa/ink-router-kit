@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Item } from '../select/types.js';
+import type { StorageAPI } from '../../storage/index.js';
 
 export type { Item };
 
@@ -101,4 +102,16 @@ export interface MultiSelectInputProps<T, I extends Item<T> = Item<T>> {
    * @default 0
    */
   readonly initialIndex?: number;
+
+  /**
+   * Optional persistence instance. When provided, the selected values are
+   * automatically saved and restored across sessions.
+   */
+  readonly storage?: StorageAPI;
+
+  /**
+   * Storage key used for persistence. Defaults to `"multi:<focusId>"` when
+   * not provided.
+   */
+  readonly storageKey?: string;
 }

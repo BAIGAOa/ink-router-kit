@@ -111,6 +111,8 @@ export function MultiSelectInput<T, I extends Item<T> = Item<T>>({
   focusId,
   limit: limitProp = 10,
   initialIndex = 0,
+  storage,
+  storageKey,
 }: MultiSelectInputProps<T, I>) {
   const isFocused = useFocusState(focusId);
   const { boundKeyboard, focusUnregister } = useKeyboard();
@@ -125,9 +127,19 @@ export function MultiSelectInput<T, I extends Item<T> = Item<T>>({
   );
 
   const isControlled = controlledSelected !== undefined;
+  const persistKey = storageKey ?? `multi:${focusId}`;
 
   const [internalSelected, setInternalSelected] =
     useState<T[]>(defaultSelected);
+
+  useEffect(() => {
+    if (!storage) return;
+    let cancelled = false;
+    storage.read.arr<T>(persistKey, defaultSelected).then((v) => {
+      if (!cancelled) setInternalSelected(v);
+    });
+    return () => { cancelled = true; };
+  }, [storage, persistKey, defaultSelected]);
 
   const selectedValues: T[] = isControlled
     ? (controlledSelected as T[])
@@ -183,6 +195,12 @@ export function MultiSelectInput<T, I extends Item<T> = Item<T>>({
 
   const allItemsRef = useRef(items);
   allItemsRef.current = items;
+
+  const storageRef = useRef(storage);
+  storageRef.current = storage;
+
+  const persistKeyRef = useRef(persistKey);
+  persistKeyRef.current = persistKey;
 
   // items 变化时修正 scroll / highlight 溢出
   useEffect(() => {
@@ -280,6 +298,7 @@ export function MultiSelectInput<T, I extends Item<T> = Item<T>>({
 
       if (!isControlledRef.current) {
         setInternalSelected(newSelected);
+        storageRef.current?.write.arr(persistKeyRef.current, newSelected);
       }
     },
     [], // 所有依赖都是 ref，引用稳定
@@ -344,6 +363,7 @@ export function MultiSelectInput<T, I extends Item<T> = Item<T>>({
 
         if (!isControlledRef.current) {
           setInternalSelected(allValues);
+          storageRef.current?.write.arr(persistKeyRef.current, allValues);
         }
       },
       { focusId: fid },
@@ -365,6 +385,7 @@ export function MultiSelectInput<T, I extends Item<T> = Item<T>>({
 
         if (!isControlledRef.current) {
           setInternalSelected([]);
+          storageRef.current?.write.arr(persistKeyRef.current, []);
         }
       },
       { focusId: fid },

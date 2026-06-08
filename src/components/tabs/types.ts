@@ -1,4 +1,5 @@
 import React from "react";
+import type { StorageAPI } from "../../storage/index.js";
 
 export interface Tab {
   /** Unique identifier for this tab. */
@@ -20,4 +21,14 @@ export interface TabsProps {
   onChange?: (id: string) => void;
   /** Uncontrolled: initial active tab id (defaults to first tab). */
   defaultActiveTab?: string;
+  /**
+   * Optional persistence instance. When provided, the active tab is
+   * automatically saved and restored across sessions.
+   */
+  storage?: StorageAPI;
+  /**
+   * Storage key used for persistence. Defaults to `"tabs:<focusId>"` when
+   * not provided.
+   */
+  storageKey?: string;
 }

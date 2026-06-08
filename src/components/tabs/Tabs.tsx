@@ -9,6 +9,8 @@ export function Tabs({
   activeTab: controlledActive,
   onChange,
   defaultActiveTab,
+  storage,
+  storageKey,
 }: TabsProps) {
   const isFocused = useFocusState(focusId);
   const { boundKeyboard, focusUnregister } = useKeyboard();
@@ -17,28 +19,42 @@ export function Tabs({
   const [internalActive, setInternalActive] = useState(
     defaultActiveTab ?? tabs[0]?.id,
   );
+
+  const persistKey = storageKey ?? `tabs:${focusId}`;
+
+  useEffect(() => {
+    if (!storage) return;
+    let cancelled = false;
+    storage.read.str(persistKey, defaultActiveTab ?? tabs[0]?.id ?? '').then((v) => {
+      if (!cancelled) setInternalActive(v);
+    });
+    return () => { cancelled = true; };
+  }, [storage, persistKey, defaultActiveTab, tabs]);
+
   const activeId = isControlled ? controlledActive : internalActive;
   const activeIndex = tabs.findIndex((t) => t.id === activeId);
 
   const prev = useCallback(() => {
-    const next = activeIndex <= 0 ? tabs.length - 1 : activeIndex - 1;
-    const id = tabs[next].id;
+    const nextIdx = activeIndex <= 0 ? tabs.length - 1 : activeIndex - 1;
+    const id = tabs[nextIdx].id;
     if (isControlled) {
       onChange?.(id);
     } else {
       setInternalActive(id);
+      storage?.write.str(persistKey, id);
     }
-  }, [activeIndex, tabs, isControlled, onChange]);
+  }, [activeIndex, tabs, isControlled, onChange, storage, persistKey]);
 
   const next = useCallback(() => {
-    const next = (activeIndex + 1) % tabs.length;
-    const id = tabs[next].id;
+    const nextIdx = (activeIndex + 1) % tabs.length;
+    const id = tabs[nextIdx].id;
     if (isControlled) {
       onChange?.(id);
     } else {
       setInternalActive(id);
+      storage?.write.str(persistKey, id);
     }
-  }, [activeIndex, tabs, isControlled, onChange]);
+  }, [activeIndex, tabs, isControlled, onChange, storage, persistKey]);
 
   useEffect(() => {
     const unLeft = boundKeyboard(['left'], () => prev(), { focusId });

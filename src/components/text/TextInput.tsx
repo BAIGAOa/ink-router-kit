@@ -255,12 +255,30 @@ export function TextInput({
  */
 export function UncontrolledTextInput({
   initialValue = '',
+  storage,
+  storageKey,
   ...props
 }: UncontrolledTextInputProps) {
   const [value, setValue] = useState(initialValue);
+  const persistKey = storageKey ?? `text:${props.focusId}`;
+
+  useEffect(() => {
+    if (!storage) return;
+    let cancelled = false;
+    storage.read.str(persistKey, initialValue).then((v) => {
+      if (!cancelled) setValue(v);
+    });
+    return () => { cancelled = true; };
+  }, [storage, persistKey, initialValue]);
+
+  const handleChange = (newVal: string) => {
+    setValue(newVal);
+    storage?.write.str(persistKey, newVal);
+  };
+
   return React.createElement(TextInput, {
     ...props,
     value,
-    onChange: setValue,
+    onChange: handleChange,
   });
 }

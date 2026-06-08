@@ -8,6 +8,7 @@ import { CurrentScreen } from '../../screen/current-screen.js';
 import { KeyboardProvider } from '../../keyboard/provider.js';
 import { useKeyboard } from '../../keyboard/hook.js';
 import { TextInput, UncontrolledTextInput } from '../../components/text/TextInput.js';
+import type { StorageAPI } from '../../storage/index.js';
 
 
 // ── 按键常量 ─────────────────────────────────────────────
@@ -47,6 +48,8 @@ async function type(stdin: { write: (data: string) => void }, chars: string) {
     await new Promise((r) => setTimeout(r, 10));
   }
 }
+
+async function flush() { await new Promise(r => setTimeout(r, 10)); }
 
 // ── Render 辅助 ──────────────────────────────────────────
 
@@ -705,5 +708,109 @@ describe('placeholder 边界', () => {
     });
 
     expect(lastFrameClean()).toContain('>');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// UncontrolledTextInput 持久化
+// ═══════════════════════════════════════════════════════════
+
+describe('UncontrolledTextInput 持久化', () => {
+  function makeMockStorage() {
+    const store: Record<string, unknown> = {};
+    return {
+      store,
+      api: {
+        write: {
+          num: vi.fn(async () => {}),
+          str: vi.fn(async (_k: string, v: string) => { store[_k] = v; }),
+          b: vi.fn(async () => {}),
+          obj: vi.fn(async () => {}),
+          arr: vi.fn(async () => {}),
+          any: vi.fn(async () => {}),
+        },
+        read: {
+          num: vi.fn(async () => 0),
+          str: vi.fn(async (k: string, def: string) => (store[k] as string) ?? def),
+          b: vi.fn(async () => false),
+          obj: vi.fn(async () => ({})),
+          arr: vi.fn(async () => []),
+          any: vi.fn(async () => undefined),
+        },
+        has: vi.fn(async () => false),
+        delete: vi.fn(async () => {}),
+        clear: vi.fn(async () => {}),
+        getAll: vi.fn(async () => ({})),
+      } as StorageAPI,
+    };
+  }
+
+  it('传入 storage 时挂载后读取并恢复文本值', async () => {
+    const { store, api } = makeMockStorage();
+    store['text:pu'] = 'hello';
+
+    function Host() {
+      return React.createElement(UncontrolledTextInput, {
+        focusId: 'pu',
+        initialValue: '',
+        storage: api,
+      });
+    }
+    clearRegistry();
+    registerComponent(Host, {});
+    render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: Host },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+    expect((api.read.str as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('text:pu', '');
+  });
+
+  it('输入文本后写入到 storage', async () => {
+    const { api } = makeMockStorage();
+
+    function Host() {
+      return React.createElement(UncontrolledTextInput, {
+        focusId: 'pu',
+        initialValue: '',
+        storage: api,
+      });
+    }
+    clearRegistry();
+    registerComponent(Host, {});
+    const { stdin } = render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: Host },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+
+    stdin.write('x');
+    await flush();
+
+    expect((api.write.str as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('text:pu', 'x');
+  });
+
+  it('传入 storageKey 时使用自定义键名', async () => {
+    const { api } = makeMockStorage();
+
+    function Host() {
+      return React.createElement(UncontrolledTextInput, {
+        focusId: 'pu',
+        initialValue: '',
+        storage: api,
+        storageKey: 'my-text',
+      });
+    }
+    clearRegistry();
+    registerComponent(Host, {});
+    render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: Host },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+    expect((api.read.str as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('my-text', '');
   });
 });

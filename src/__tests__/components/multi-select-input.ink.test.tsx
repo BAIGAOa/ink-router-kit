@@ -10,6 +10,7 @@ import { useKeyboard } from '../../keyboard/hook.js';
 import { useScreenSystem } from '../../screen/hook.js';
 import { MultiSelectInput } from '../../components/multi-select/MultiSelectInput.js';
 import type { Item } from '../../components/select/types.js';
+import type { StorageAPI } from '../../storage/index.js';
 
 const KEYS = {
   enter: '\r',
@@ -984,5 +985,88 @@ describe('非聚焦渲染（isFocused=false）', () => {
 
     const output = lastFrameClean();
     expect(output).toContain('\u25C9');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// 12. 持久化
+// ═══════════════════════════════════════════════════════════
+
+describe('持久化', () => {
+  function makeMockStorage() {
+    const store: Record<string, unknown> = {};
+    return {
+      store,
+      api: {
+        write: {
+          num: vi.fn(async () => {}),
+          str: vi.fn(async () => {}),
+          b: vi.fn(async () => {}),
+          obj: vi.fn(async () => {}),
+          arr: vi.fn(async (_k: string, v: unknown[]) => { store[_k] = v; }),
+          any: vi.fn(async () => {}),
+        },
+        read: {
+          num: vi.fn(async () => 0),
+          str: vi.fn(async () => ''),
+          b: vi.fn(async () => false),
+          obj: vi.fn(async () => ({})),
+          arr: vi.fn(async (k: string, def: unknown[]) => (store[k] as unknown[]) ?? def),
+          any: vi.fn(async () => undefined),
+        },
+        has: vi.fn(async () => false),
+        delete: vi.fn(async () => {}),
+        clear: vi.fn(async () => {}),
+        getAll: vi.fn(async () => ({})),
+      } as StorageAPI,
+    };
+  }
+
+  it('传入 storage 时挂载后读取已选数组并恢复', async () => {
+    const { store, api } = makeMockStorage();
+    store['multi:ms'] = ['light'];
+
+    function Host() {
+      return React.createElement(MultiSelectInput, {
+        focusId: 'ms',
+        items: threeItems,
+        storage: api,
+      });
+    }
+    clearRegistry();
+    registerComponent(Host, {});
+    render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: Host },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+    expect((api.read.arr as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('multi:ms', []);
+  });
+
+  it('切换选中后写入数组到 storage', async () => {
+    const { api } = makeMockStorage();
+
+    function Host() {
+      return React.createElement(MultiSelectInput, {
+        focusId: 'ms',
+        items: threeItems,
+        storage: api,
+      });
+    }
+    clearRegistry();
+    registerComponent(Host, {});
+    const { stdin } = render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: Host },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+
+    // Toggle first item
+    stdin.write(' ');
+    await flush();
+
+    expect((api.write.arr as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('multi:ms', ['dark']);
   });
 });

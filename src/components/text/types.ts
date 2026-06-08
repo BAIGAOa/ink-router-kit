@@ -1,4 +1,6 @@
 
+import type { StorageAPI } from "../../storage/index.js";
+
 /**
  * Props for the controlled TextInput component.
  * @template T - The type of the value (typically string).
@@ -57,4 +59,14 @@ export type UncontrolledTextInputProps = {
    * @default ''
    */
   readonly initialValue?: string;
+  /**
+   * Optional persistence instance. When provided, the text value is
+   * automatically saved and restored across sessions.
+   */
+  readonly storage?: StorageAPI;
+  /**
+   * Storage key used for persistence. Defaults to `"text:<focusId>"` when
+   * not provided.
+   */
+  readonly storageKey?: string;
 } & Omit<TextInputProps, 'value' | 'onChange'>;

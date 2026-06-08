@@ -1,4 +1,5 @@
 import React from "react";
+import type { StorageAPI } from "../../storage/index.js";
 
 /**
  * The SelectInput component is required to pass in a type interface that must be included to act as a constraint
@@ -47,4 +48,14 @@ export interface SelectInputProps<T, I extends Item<T> = Item<T>> {
   * The list will be scrolled
   */
   limit?: number;
+  /**
+   * Optional persistence instance. When provided, the cursor position
+   * (selectedIndex) is automatically saved and restored across sessions.
+   */
+  storage?: StorageAPI;
+  /**
+   * Storage key used for persistence. Defaults to `"select:<focusId>"` when
+   * not provided.
+   */
+  storageKey?: string;
 }

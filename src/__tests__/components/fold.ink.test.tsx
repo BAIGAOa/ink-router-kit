@@ -7,12 +7,15 @@ import { ScenarioManagementProvider } from '../../screen/provider.js';
 import { CurrentScreen } from '../../screen/current-screen.js';
 import { KeyboardProvider } from '../../keyboard/provider.js';
 import { Fold } from '../../components/fold/Fold.js';
+import type { StorageAPI } from '../../storage/index.js';
 
 function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, '');
 }
 
-function renderFold(props?: { expanded?: boolean; onToggle?: () => void; preview?: React.ReactNode }) {
+async function flush() { await new Promise(r => setTimeout(r, 10)); }
+
+function renderFold(props?: { expanded?: boolean; onToggle?: () => void; preview?: React.ReactNode; storage?: StorageAPI; storageKey?: string }) {
   function Host() {
     return React.createElement(Fold, {
       focusId: 'fold',
@@ -20,6 +23,8 @@ function renderFold(props?: { expanded?: boolean; onToggle?: () => void; preview
       expanded: props?.expanded,
       onToggle: props?.onToggle,
       preview: props?.preview,
+      storage: props?.storage,
+      storageKey: props?.storageKey,
     }, React.createElement(Text, null, 'Hidden content'));
   }
 
@@ -90,5 +95,103 @@ describe('Fold', () => {
     );
     const output = stripAnsi(lastFrame());
     expect(output).toContain('Content inside');
+  });
+});
+
+describe('Fold 持久化', () => {
+  function makeMockStorage() {
+    const store: Record<string, unknown> = {};
+    return {
+      store,
+      api: {
+        write: {
+          num: vi.fn(async () => {}),
+          str: vi.fn(async () => {}),
+          b: vi.fn(async (_k: string, v: boolean) => { store[_k] = v; }),
+          obj: vi.fn(async () => {}),
+          arr: vi.fn(async () => {}),
+          any: vi.fn(async () => {}),
+        },
+        read: {
+          num: vi.fn(async () => 0),
+          str: vi.fn(async () => ''),
+          b: vi.fn(async (k: string, def: boolean) => (store[k] as boolean) ?? def),
+          obj: vi.fn(async () => ({})),
+          arr: vi.fn(async () => []),
+          any: vi.fn(async () => undefined),
+        },
+        has: vi.fn(async () => false),
+        delete: vi.fn(async () => {}),
+        clear: vi.fn(async () => {}),
+        getAll: vi.fn(async () => ({})),
+      } as StorageAPI,
+    };
+  }
+
+  it('传入 storage 时，展开/折叠后写入 storage', async () => {
+    const { api } = makeMockStorage();
+
+    function Host() {
+      return React.createElement(Fold, {
+        focusId: 'pf',
+        label: 'Test',
+        storage: api,
+      }, React.createElement(Text, null, 'Inside'));
+    }
+    clearRegistry();
+    registerComponent(Host, {});
+    const { stdin } = render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: Host },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+
+    stdin.write(' ');
+    await flush();
+
+    expect((api.write.b as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('fold:pf', true);
+  });
+
+  it('传入 storageKey 时使用自定义键名', async () => {
+    const { api } = makeMockStorage();
+
+    function Host() {
+      return React.createElement(Fold, {
+        focusId: 'pf',
+        label: 'Test',
+        storage: api,
+        storageKey: 'custom-fold-key',
+      }, React.createElement(Text, null, 'Inside'));
+    }
+    clearRegistry();
+    registerComponent(Host, {});
+    render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: Host },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+
+    expect((api.read.b as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('custom-fold-key', false);
+  });
+
+  it('不传 storage 时不影响现有行为', async () => {
+    function Host() {
+      return React.createElement(Fold, {
+        focusId: 'pf',
+        label: 'Test',
+      }, React.createElement(Text, null, 'Inside'));
+    }
+    clearRegistry();
+    registerComponent(Host, {});
+    const { lastFrame } = render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: Host },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+    expect(stripAnsi(lastFrame())).toContain('Test');
+    expect(stripAnsi(lastFrame())).not.toContain('Inside');
   });
 });

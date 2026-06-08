@@ -8,6 +8,7 @@ import { CurrentScreen } from '../../screen/current-screen.js';
 import { KeyboardProvider } from '../../keyboard/provider.js';
 import { useKeyboard } from '../../keyboard/hook.js';
 import { Tabs, TextInput, SelectInput, Field } from '../../index.js';
+import type { StorageAPI } from '../../storage/index.js';
 
 const KEYS = {
   left: '\x1b[D',
@@ -186,5 +187,114 @@ describe('Tabs + 输入组件集成', () => {
     // 验证 Field 通过 Form Context 工作（无异常）
     // 如果 Field 连通了 Form，onSubmit 应能获取值
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe('Tabs 持久化', () => {
+  function makeMockStorage() {
+    const store: Record<string, unknown> = {};
+    return {
+      store,
+      api: {
+        write: {
+          num: vi.fn(async () => {}),
+          str: vi.fn(async (_k: string, v: string) => { store[_k] = v; }),
+          b: vi.fn(async () => {}),
+          obj: vi.fn(async () => {}),
+          arr: vi.fn(async () => {}),
+          any: vi.fn(async () => {}),
+        },
+        read: {
+          num: vi.fn(async () => 0),
+          str: vi.fn(async (k: string, def: string) => (store[k] as string) ?? def),
+          b: vi.fn(async () => false),
+          obj: vi.fn(async () => ({})),
+          arr: vi.fn(async () => []),
+          any: vi.fn(async () => undefined),
+        },
+        has: vi.fn(async () => false),
+        delete: vi.fn(async () => {}),
+        clear: vi.fn(async () => {}),
+        getAll: vi.fn(async () => ({})),
+      } as StorageAPI,
+    };
+  }
+
+  it('传入 storage 时挂载后读取并恢复 activeTab', async () => {
+    const { store, api } = makeMockStorage();
+    store['tabs:main'] = 'b';
+
+    function Host() {
+      return React.createElement(Tabs, {
+        focusId: 'main',
+        storage: api,
+        tabs: [
+          { id: 'a', label: 'A', content: React.createElement(Text, null, 'Page A') },
+          { id: 'b', label: 'B', content: React.createElement(Text, null, 'Page B') },
+        ],
+      });
+    }
+    clearRegistry();
+    registerComponent(Host, {});
+    const { lastFrame } = render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: Host },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+    expect(stripAnsi(lastFrame())).toContain('Page B');
+  });
+
+  it('切换 tab 后写入 storage', async () => {
+    const { api } = makeMockStorage();
+
+    function Host() {
+      return React.createElement(Tabs, {
+        focusId: 'main',
+        storage: api,
+        tabs: [
+          { id: 'a', label: 'A', content: React.createElement(Text, null, 'Page A') },
+          { id: 'b', label: 'B', content: React.createElement(Text, null, 'Page B') },
+        ],
+      });
+    }
+    clearRegistry();
+    registerComponent(Host, {});
+    const { stdin } = render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: Host },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+
+    stdin.write(KEYS.right);
+    await flush();
+
+    expect((api.write.str as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('tabs:main', 'b');
+  });
+
+  it('传入 storageKey 时使用自定义键名', async () => {
+    const { api } = makeMockStorage();
+
+    function Host() {
+      return React.createElement(Tabs, {
+        focusId: 'main',
+        storage: api,
+        storageKey: 'custom-tab',
+        tabs: [
+          { id: 'a', label: 'A', content: React.createElement(Text, null, 'Page A') },
+          { id: 'b', label: 'B', content: React.createElement(Text, null, 'Page B') },
+        ],
+      });
+    }
+    clearRegistry();
+    registerComponent(Host, {});
+    render(
+      React.createElement(ScenarioManagementProvider, { defaultScreen: Host },
+        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
+      ),
+    );
+    await flush();
+    expect((api.read.str as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('custom-tab', 'a');
   });
 });

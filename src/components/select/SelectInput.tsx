@@ -48,6 +48,8 @@ export function SelectInput<T, I extends Item<T> = Item<T>>({
   indicatorComponent,
   focusId,
   limit: limitProp = 10,
+  storage,
+  storageKey,
 }: SelectInputProps<T, I>) {
   const isFocused = useFocusState(focusId);
   const { boundKeyboard, focusUnregister } = useKeyboard();
@@ -56,11 +58,36 @@ export function SelectInput<T, I extends Item<T> = Item<T>>({
   const ItemComp = (itemComponent ??
     (defaultItem as unknown as React.ComponentType<I & { isSelected: boolean }>));
 
+  const persistKey = storageKey ?? `select:${focusId}`;
+
   const hasLimit = items.length > limitProp;
   const limit = hasLimit ? limitProp : items.length;
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
+
+  useEffect(() => {
+    if (!storage || items.length === 0) return;
+    let cancelled = false;
+    storage.read.num(persistKey, 0).then((absIdx) => {
+      if (cancelled) return;
+      const clamped = clamp(absIdx, 0, Math.max(0, items.length - 1));
+      if (hasLimit) {
+        const newScroll = Math.max(0, Math.min(clamped, items.length - limit));
+        setScrollOffset(newScroll);
+        setSelectedIndex(clamped - newScroll);
+      } else {
+        setSelectedIndex(clamped);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [storage, persistKey, items.length, hasLimit, limit]);
+
+  useEffect(() => {
+    if (!storage || items.length === 0) return;
+    const absIdx = scrollOffset + selectedIndex;
+    storage.write.num(persistKey, absIdx);
+  }, [storage, persistKey, selectedIndex, scrollOffset, items.length]);
 
   const selectedIndexRef = useRef(selectedIndex);
   selectedIndexRef.current = selectedIndex;

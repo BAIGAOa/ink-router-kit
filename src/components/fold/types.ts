@@ -1,4 +1,5 @@
 import React from "react";
+import type { StorageAPI } from "../../storage/index.js";
 
 export interface FoldProps {
   /** Focus target for the fold header bar. */
@@ -15,4 +16,14 @@ export interface FoldProps {
   onToggle?: () => void;
   /** Uncontrolled: initial expanded state. Defaults to false. */
   defaultExpanded?: boolean;
+  /**
+   * Optional persistence instance. When provided, the expanded state is
+   * automatically saved and restored across sessions.
+   */
+  storage?: StorageAPI;
+  /**
+   * Storage key used for persistence. Defaults to `"fold:<focusId>"` when
+   * not provided.
+   */
+  storageKey?: string;
 }
