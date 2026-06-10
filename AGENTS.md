@@ -53,10 +53,83 @@ Component Library (src/components/)
 
 Test Conventions
 
+Core principles
+
+· No “happy path only” tests. Every test must exercise a behaviour that could realistically break: edge cases, failure modes, state transitions, or regressions. A test that never fails is worse than no test — it creates false confidence.
+· Coverage must be comprehensive. For every feature, include:
+  · Normal behaviour (the primary use case)
+  · Edge cases (empty lists, null/undefined, max/min values, overflow, zero, negative numbers)
+  · Error paths (invalid inputs, precondition failures, thrown exceptions)
+  · Boundary conditions (off‑by‑one neighbours, first/last element, scroll boundaries)
+  · Concurrency / race conditions (when applicable)
+  · Resource cleanup (unmount, cancellation, abort signals)
+· No “test the framework” — do not test that React, Ink, or Node built‑ins work. Test your logic.
+· Each test must have a clear reason to exist. If you cannot describe what behaviour the test locks down and why that behaviour matters, delete the test.
+
+Test file conventions
+
 · *.test.tsx — jsdom via @testing-library/react; mock useInput to capture+dispatch synthetic keys.
-· *.ink.test.ts(x) — node env via ink-testing-library for real Ink rendering.
-· clearRegistry() in beforeEach; clearDispatchers() for module-level nav isolation.
-· Test config in vitest.config.ts — default jsdom, environmentMatchGlobs for .ink.test.* → node.
+· *.ink.test.ts(x) — node environment via ink-testing-library for real Ink rendering (no DOM emulation).
+· clearRegistry() in beforeEach; clearDispatchers() for module-level navigation isolation.
+· Test configuration in vitest.config.ts — default jsdom, with environmentMatchGlobs mapping *.ink.test.* to node.
+
+Good test example (covers edge cases and failures)
+
+```ts
+describe('NumberInput', () => {
+  it('does not go below min', async () => {
+    const onChange = vi.fn();
+    renderNumberInput({ value: 0, min: 0, onChange });
+    await pressKey('down');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('handles NaN value gracefully', async () => {
+    const onChange = vi.fn();
+    renderNumberInput({ value: NaN, onChange });
+    await pressKey('up');
+    expect(onChange).toHaveBeenCalledWith(1);
+  });
+});
+```
+
+Bad test example (happy only, useless)
+
+```ts
+test('increments value', () => {
+  const { result } = renderHook(() => useState(0));
+  act(() => result.current[1](1));
+  expect(result.current[0]).toBe(1);
+});
+// This tests nothing about the component, just that useState works.
+```
+
+TDD Workflow
+
+This project follows test‑driven development (TDD) for implementing new features and fixing bugs.
+
+· Before writing any implementation code, write a failing test that describes the desired behaviour.
+· Then write the minimal code to make that test pass.
+· Refactor only after the test passes, and only with the test suite still green.
+· The .reasonix/skills/tdd/ directory contains detailed TDD skills (deep modules, interface design, mocking, refactoring, tests). Load these skills when starting a TDD cycle.
+
+When to load TDD skills
+
+· Starting a new feature or component → load tdd skill to guide the red‑green‑refactor loop.
+· Refactoring existing code → load tdd/refactoring.md and tdd/tests.md.
+· Designing a public interface → load tdd/interface-design.md and tdd/deep-modules.md.
+
+Planning & Communication
+
+Before executing any plan
+
+When you (the agent) are about to implement a plan proposed by the user, restate your understanding of the plan back to the user. This ensures there is no misalignment.
+
+Use the following pattern:
+
+“I understand the plan as: [concise summary of what we will do, in what order, and what the expected outcome is]. Is this correct, or is there any deviation?”
+
+If the user’s description is unclear, ambiguous, or missing details, load the grill-me skill from .reasonix/skills/grill-me/. This skill will interview the user with one question at a time until the plan is fully clarified.
 
 Coding Conventions
 
@@ -114,10 +187,6 @@ useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 Hook encapsulation rule
 
 When the same useEffect + useRef pattern appears in 3+ components, extract it into a custom hook. (Note: the focusUnregister pattern exists in 8+ components but hasn't been extracted yet — a candidate for useFocusLifecycle.)
-
-Test philosophy
-
-Target specific behaviors that could break: edge cases, failure modes, state transitions, regressions. No "happy tests" that never fail. Cover real user flows, not line counts.
 
 Comment conventions
 
@@ -213,7 +282,7 @@ Every public function, component, type, or constant exported from src/index.ts m
  * ```tsx
  * registerComponent(Menu, {});
  * registerComponent(Game, { level: 1 }, { parent: Menu });
- *```
+* ```
 
 */
 export function registerComponent<C extends React.ComponentType<any>>(
