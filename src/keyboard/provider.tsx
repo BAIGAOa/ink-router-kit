@@ -205,11 +205,21 @@ function handleLayer(
   isTop: boolean,
   notifyFocusChange: () => void,
   activeOverlayCount: number,
+  isOverlay: boolean,
 ): boolean {
   if (isTop && handleTabNavigation(layer, eventNames, key.shift, notifyFocusChange)) return true;
 
   const blocked = layer.blockedKeys;
   const unblocked = eventNames.filter((n) => !blocked.includes(n));
+
+  // onlyThis semantics differ between screens and overlays:
+  // - Screen: skip when any overlay is active (activeOverlayCount > 0)
+  // - Overlay: skip only when multiple overlays compete (activeOverlayCount > 1)
+  const shouldSkipOnlyThis = (b: BoundKeyEntry): boolean => {
+    if (!b.onlyThis) return false;
+    if (isOverlay) return activeOverlayCount > 1;
+    return activeOverlayCount > 0;
+  };
 
   if (isTop && layer.currentFocusId) {
     const ft = layer.focusTargets.get(layer.currentFocusId);
@@ -217,8 +227,7 @@ function handleLayer(
       const fBlocked = ft.blockedKeys;
       const fUnblocked = unblocked.filter((n) => !fBlocked.includes(n));
 
-      const skipOnlyThis = (b: BoundKeyEntry) => b.onlyThis && activeOverlayCount > 1;
-      if (tryMatchBindings(ft.bindings, fUnblocked, input, key, skipOnlyThis)) return true;
+      if (tryMatchBindings(ft.bindings, fUnblocked, input, key, shouldSkipOnlyThis)) return true;
 
       if (eventNames.some((n) => ft.stoppedKeys.includes(n))) {
         return true;
@@ -226,8 +235,7 @@ function handleLayer(
     }
   }
 
-  const skipOnlyThis = (b: BoundKeyEntry) => b.onlyThis && activeOverlayCount > 1;
-  if (tryMatchBindings(layer.bindings, unblocked, input, key, skipOnlyThis)) return true;
+  if (tryMatchBindings(layer.bindings, unblocked, input, key, shouldSkipOnlyThis)) return true;
 
   if (isTop && eventNames.some((n) => layer.stoppedKeys.includes(n))) {
     return true;
@@ -1049,7 +1057,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
     for (const overlay of activeOverlays) {
       const layer = layersRef.current.get(overlay.id);
-      if (layer && handleLayer(layer, eventNames, input, key, true, notifyFocusChange, activeCount)) {
+      if (layer && handleLayer(layer, eventNames, input, key, true, notifyFocusChange, activeCount, true)) {
         anyOverlayConsumed = true;
         // 不 break，继续下一个浮层
       }
@@ -1078,7 +1086,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         const layer = layersRef.current.get(comp);
         if (!layer) continue;
         const isTop = i === path.length - 1;
-        if (handleLayer(layer, eventNames, input, key, isTop, notifyFocusChange, activeCount)) break;
+        if (handleLayer(layer, eventNames, input, key, isTop, notifyFocusChange, activeCount, false)) break;
       }
     }
   });

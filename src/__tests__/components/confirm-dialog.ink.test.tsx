@@ -45,10 +45,10 @@ function renderDialog(props: {
 
   function HostScreen() {
     const kb = useKeyboard();
-    const { overlay: showOverlay } = useScreenSystem();
+    const { openOverlay: showOverlay } = useScreenSystem();
     useEffect(() => {
       kbRef.current = kb;
-      showOverlay(ConfirmDialog, {
+      showOverlay('confirm-dialog', ConfirmDialog, {
         title: props.title,
         message: props.message,
         confirmLabel: props.confirmLabel,

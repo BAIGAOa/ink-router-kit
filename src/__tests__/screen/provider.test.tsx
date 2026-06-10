@@ -13,6 +13,8 @@ import {
   openOverlay,
   closeOverlay,
   closeAllOverlays,
+  activateOverlay,
+  deactivateOverlay,
 } from '../../screen/provider.js';
 import { useScreenSystem } from '../../screen/hook.js';
 import { CurrentScreen } from '../../screen/current-screen.js';
@@ -436,6 +438,105 @@ describe('overlay（多浮层）', () => {
 
     act(() => get()!.activateOverlay('n1'));
     expect(get()!.activeOverlayIds).toContain('n1');
+  });
+
+  it('closeOverlay 传入未知 ID 时抛错', () => {
+    const { get } = renderWithRef(Menu);
+    expect(() =>
+      act(() => get()!.closeOverlay('nonexistent')),
+    ).toThrow(/Cannot close overlay.*no overlay with that ID exists/);
+  });
+
+  it('activateOverlay 传入未知 ID 时抛错', () => {
+    const { get } = renderWithRef(Menu);
+    expect(() =>
+      act(() => get()!.activateOverlay('nonexistent')),
+    ).toThrow(/Cannot activate overlay.*no overlay with that ID exists/);
+  });
+
+  it('deactivateOverlay 传入未知 ID 时抛错', () => {
+    const { get } = renderWithRef(Menu);
+    expect(() =>
+      act(() => get()!.deactivateOverlay('nonexistent')),
+    ).toThrow(/Cannot deactivate overlay.*no overlay with that ID exists/);
+  });
+
+  it('模块级 closeOverlay 传入未知 ID 时抛错', () => {
+    renderWithRef(Menu);
+    expect(() =>
+      act(() => closeOverlay('nonexistent')),
+    ).toThrow(/Cannot close overlay.*no overlay with that ID exists/);
+  });
+
+  it('模块级 activateOverlay/deactivateOverlay 行为一致', () => {
+    const { get } = renderWithRef(Menu);
+    act(() => get()!.openOverlay('n1', Notification, { message: 'test' }));
+    act(() => deactivateOverlay('n1'));
+    expect(get()!.activeOverlayIds).not.toContain('n1');
+    act(() => activateOverlay('n1'));
+    expect(get()!.activeOverlayIds).toContain('n1');
+  });
+
+  it('openOverlay activate:false 时打开但不激活', () => {
+    const { get } = renderWithRef(Menu);
+    act(() => get()!.openOverlay('n1', Notification, { message: 'x' }, { activate: false }));
+    expect(get()!.displayedOverlays.length).toBe(1);
+    expect(get()!.activeOverlayIds).not.toContain('n1');
+  });
+
+  it('zIndex 控制浮层排序（数值大在上层）', () => {
+    const { get } = renderWithRef(Menu);
+    act(() => get()!.openOverlay('back', Notification, { message: 'behind' }, { zIndex: 10 }));
+    act(() => get()!.openOverlay('front', Notification, { message: 'ahead' }, { zIndex: 20 }));
+    act(() => get()!.openOverlay('middle', Notification, { message: 'mid' }, { zIndex: 15 }));
+
+    const displayed = get()!.displayedOverlays;
+    expect(displayed.length).toBe(3);
+    // Sorted by zIndex ascending: 10, 15, 20
+    expect(displayed[0].id).toBe('back');
+    expect(displayed[1].id).toBe('middle');
+    expect(displayed[2].id).toBe('front');
+  });
+
+  it('相同 zIndex 时按 createdAt 时间戳排序', () => {
+    const { get } = renderWithRef(Menu);
+    act(() => get()!.openOverlay('first', Notification, { message: '1st' }, { zIndex: 5 }));
+    act(() => get()!.openOverlay('second', Notification, { message: '2nd' }, { zIndex: 5 }));
+
+    const displayed = get()!.displayedOverlays;
+    expect(displayed.length).toBe(2);
+    expect(displayed[0].zIndex).toBe(5);
+    expect(displayed[1].zIndex).toBe(5);
+    expect(displayed[0].createdAt).toBeLessThanOrEqual(displayed[1].createdAt);
+    // Earlier created comes first
+    expect(displayed[0].id).toBe('first');
+    expect(displayed[1].id).toBe('second');
+  });
+
+  it('多个不同组件的浮层可以同时打开', () => {
+    const { get } = renderWithRef(Menu);
+    act(() => get()!.openOverlay('notif-1', Notification, { message: 'a' }));
+    act(() => get()!.openOverlay('notif-2', Notification, { message: 'b' }));
+    act(() => get()!.openOverlay('inv-1', Inventory, { items: ['sword', 'shield'] }));
+
+    const displayed = get()!.displayedOverlays;
+    expect(displayed.length).toBe(3);
+    expect(displayed.map(d => d.id).sort()).toEqual(['inv-1', 'notif-1', 'notif-2']);
+    expect(get()!.activeOverlayIds.length).toBe(3);
+  });
+
+  it('关闭一个浮层后其他浮层不受影响', () => {
+    const { get } = renderWithRef(Menu);
+    act(() => get()!.openOverlay('a', Notification, { message: 'A' }));
+    act(() => get()!.openOverlay('b', Notification, { message: 'B' }));
+    act(() => get()!.openOverlay('c', Notification, { message: 'C' }));
+
+    act(() => get()!.closeOverlay('b'));
+    expect(get()!.displayedOverlays.length).toBe(2);
+    expect(get()!.displayedOverlays.map(d => d.id)).toEqual(['a', 'c']);
+    expect(get()!.activeOverlayIds.includes('b')).toBe(false);
+    expect(get()!.activeOverlayIds.includes('a')).toBe(true);
+    expect(get()!.activeOverlayIds.includes('c')).toBe(true);
   });
 });
 

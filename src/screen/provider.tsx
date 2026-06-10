@@ -348,6 +348,12 @@ function screenReducer(state: ScreenState, action: ScreenAction): ScreenState {
     }
 
     case 'closeOverlay': {
+      if (!state.overlays.some(o => o.id === action.id)) {
+        throw new Error(
+          `[Ink-Router-Kit] Cannot close overlay "${action.id}": no overlay with that ID exists.`,
+        );
+      }
+
       const newOverlays = state.overlays.filter(o => o.id !== action.id);
       const newActiveIds = new Set(state.activeOverlayIds);
       newActiveIds.delete(action.id);
@@ -384,6 +390,12 @@ function screenReducer(state: ScreenState, action: ScreenAction): ScreenState {
     }
 
     case 'deactivateOverlay': {
+      if (!state.overlays.some(o => o.id === action.id)) {
+        throw new Error(
+          `[Ink-Router-Kit] Cannot deactivate overlay "${action.id}": no overlay with that ID exists.`,
+        );
+      }
+
       const newActiveIds = new Set(state.activeOverlayIds);
       newActiveIds.delete(action.id);
 
