@@ -11,34 +11,46 @@ import type {
   OverlayEntry,
 } from './types.js';
 
+/**
+ * Value provided by {@link ScenarioManagementProvider} via React context.
+ *
+ * Includes the current screen, all active overlays, navigation functions,
+ * and overlay management functions for the multi-overlay system.
+ */
 export interface ScreenSystemContextValue {
-  /** 当前屏幕的已渲染元素（栈顶组件） */
+  /** The rendered React element for the current (top-of-stack) screen. */
   currentScreen: ReactNode;
-  /** 所有浮层的已渲染元素（按 zIndex 升序） */
+  /** Rendered React elements for all overlays, sorted by zIndex ascending. */
   currentOverlays: ReactNode[];
-  /** 当前激活路径：从根到栈顶的组件数组 */
+  /** Full navigation path from root to the current screen. */
   currentPath: React.ComponentType<any>[];
-  /** 沿树向下跳转（选分支） */
+  /** Navigate down the tree to a direct child of the current screen. */
   skip: SkipFn;
-  /** 沿树向上返回父节点 */
+  /** Navigate up the tree toward the root. */
   back: BackFn;
-  /** 跨分支跳转到任意已注册节点 */
+  /** Jump to any registered screen across branches via LCA resolution. */
   gotoScreen: GotoScreenFn;
-  /** 打开浮层 */
+  /** Open a new overlay with a unique ID. Multiple overlays can coexist. */
   openOverlay: OpenOverlayFn;
-  /** 关闭指定浮层 */
+  /** Close a specific overlay by its ID. */
   closeOverlay: CloseOverlayFn;
-  /** 关闭所有浮层 */
+  /** Close all open overlays at once. */
   closeAllOverlays: CloseAllOverlaysFn;
-  /** 激活指定浮层 */
+  /** Activate an overlay so it receives keyboard events. */
   activateOverlay: ActivateOverlayFn;
-  /** 停用指定浮层 */
+  /** Deactivate an overlay so it stops receiving keyboard events. */
   deactivateOverlay: DeactivateOverlayFn;
-  /** 当前激活的浮层 ID 列表 */
+  /** IDs of overlays that are currently active (receiving keyboard events). */
   activeOverlayIds: string[];
-  /** 当前显示的浮层列表（只读） */
+  /** All currently displayed overlays with metadata (id, zIndex, etc.). */
   displayedOverlays: OverlayEntry[];
 }
 
+/**
+ * React context for the screen navigation system.
+ *
+ * Accessed via {@link useScreenSystem}. Must be provided by a
+ * {@link ScenarioManagementProvider} at the root of the component tree.
+ */
 export const ScreenSystemContext =
   createContext<ScreenSystemContextValue | null>(null);

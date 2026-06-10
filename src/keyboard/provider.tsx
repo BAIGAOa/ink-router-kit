@@ -142,6 +142,20 @@ function checkGlobalKey(
   return true;
 }
 
+/**
+ * Iterate through a list of bindings and fire the first matching handler.
+ *
+ * Matches exact key names first, then falls back to the wildcard `"*"` binding
+ * for normal character input (see {@link isNormalCharacter}).
+ *
+ * @param bindings      Ordered list of key bindings to try.
+ * @param unblockedKeys Normalized key names not blocked at this layer.
+ * @param input         Raw character from Ink's useInput.
+ * @param key           Full Key descriptor from Ink.
+ * @param skipBinding   Optional predicate to skip individual bindings
+ *                      (used for `onlyThis` enforcement).
+ * @returns `true` if a binding matched and consumed the event.
+ */
 function tryMatchBindings(
   bindings: BoundKeyEntry[],
   unblockedKeys: string[],
@@ -170,6 +184,15 @@ function tryMatchBindings(
   return false;
 }
 
+/**
+ * Built-in Tab / Shift+Tab focus rotation for a given layer.
+ *
+ * Cycles {@link ScreenKeyboardLayer.currentFocusId} through the layer's
+ * {@link ScreenKeyboardLayer.focusOrder} list (Tab forward, Shift+Tab backward).
+ * Wraps around at both ends.
+ *
+ * @returns `true` if a tab event was handled and focus was moved.
+ */
 function handleTabNavigation(
   layer: ScreenKeyboardLayer,
   eventNames: string[],
@@ -244,6 +267,11 @@ function handleLayer(
   return false;
 }
 
+/**
+ * Remove keys from {@link ScreenKeyboardLayer.globalKeyOverrides} when no
+ * bindings (screen-level or focus-target) still reference them.
+ * Keeps the override set consistent after unbind operations.
+ */
 function cleanupGlobalKeyOverrides(
   layer: ScreenKeyboardLayer,
   keys: string[],
@@ -260,7 +288,12 @@ function cleanupGlobalKeyOverrides(
   }
 }
 
-// 从 actionKeysMap 中移除指定 actionId 对应的 keys（若集合为空则删除整个条目）
+/**
+ * Remove specific keys from an action's entry in the actionKeysMap.
+ * If no keys remain for the action after removal, the entire entry is deleted.
+ *
+ * Used during unbind to keep the map consistent with the current bindings.
+ */
 function removeKeysFromActionMap(
   map: Map<string, string[]>,
   actionId: string,

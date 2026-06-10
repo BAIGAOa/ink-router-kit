@@ -66,12 +66,16 @@ Menu (root)
 └── QuitConfirm
 ```
 
- Operation    | Description                                                      |
- ------------ | ---------------------------------------------------------------- |
- `skip`       | Walk down the tree to a direct child                             |
- `back`       | Walk up the tree toward the root (default 1 level). Pass `back(n)` to go multiple levels ||
- `gotoScreen` | Jump across branches (finds the nearest common ancestor, rebuilds the path) |
- `overlay`    | Open a floating overlay independent of the tree (path unchanged) |
+ Operation       | Description                                                      |
+ --------------- | ---------------------------------------------------------------- |
+ `skip`          | Walk down the tree to a direct child                             |
+ `back`          | Walk up the tree toward the root (default 1 level). Pass `back(n)` to go multiple levels |
+ `gotoScreen`    | Jump across branches (finds the nearest common ancestor, rebuilds the path) |
+ `openOverlay`   | Open a floating overlay with a unique ID                         |
+ `closeOverlay`  | Close a specific overlay by ID                                   |
+ `closeAllOverlays` | Close all open overlays at once                               |
+ `activateOverlay` | Activate an overlay so it receives keyboard events           |
+ `deactivateOverlay` | Deactivate an overlay so it stops receiving keyboard events|
 
 ---
 
@@ -130,10 +134,10 @@ Root context provider wrapping the entire application.
 <CurrentScreen />
 ```
 
-Renders the current top-of-stack screen and any active overlay.
+Renders the current top-of-stack screen and all displayed overlays.
 
-- No overlay: renders only the stack-top component.
-- With overlay: the screen renders underneath, the overlay on top (wrapped in `<Box>`).
+- No overlays: renders only the stack-top component.
+- With overlays: renders the screen first, then overlays on top in zIndex order (lowest zIndex rendered first, highest rendered last — on top visually). Each overlay is wrapped in `OverlayContext.Provider` for keyboard isolation.
 
 ---
 
@@ -141,14 +145,19 @@ Renders the current top-of-stack screen and any active overlay.
 
 ```tsx
 const {
-  currentScreen,   // ReactNode — the currently rendered screen element
-  currentOverlay,  // ReactNode | null — the current overlay element
-  currentPath,     // React.ComponentType[] — path from root to stack top
-  skip,            // SkipFn
-  back,            // BackFn
-  gotoScreen,      // GotoScreenFn
-  overlay,         // OverlayFn
-  closeOverlay,    // CloseOverlayFn
+  currentScreen,      // ReactNode — the currently rendered screen element
+  currentOverlays,    // ReactNode[] — all rendered overlay elements (sorted by zIndex)
+  currentPath,        // React.ComponentType[] — path from root to stack top
+  skip,               // SkipFn
+  back,               // BackFn
+  gotoScreen,         // GotoScreenFn
+  openOverlay,        // OpenOverlayFn
+  closeOverlay,       // CloseOverlayFn
+  closeAllOverlays,   // CloseAllOverlaysFn
+  activateOverlay,    // ActivateOverlayFn
+  deactivateOverlay,  // DeactivateOverlayFn
+  activeOverlayIds,   // string[] — IDs of overlays currently receiving keyboard events
+  displayedOverlays,  // OverlayEntry[] — metadata for all displayed overlays
 } = useScreenSystem();
 ```
 
@@ -217,43 +226,99 @@ Automatically finds the nearest common ancestor and rebuilds the path.
 
 ---
 
-### `overlay`
+### `openOverlay`
 
 ```tsx
-overlay(component, params);
+openOverlay(id, component, params, options?);
 ```
 
-Open a floating overlay on top of the screen stack.
+Open a floating overlay on top of the screen stack. Multiple overlays can coexist, distinguished by unique IDs.
 
 ```tsx
-overlay(PauseMenu, { message: 'Paused' });
+openOverlay('pause-1', PauseMenu, { message: 'Paused' });
+openOverlay('notif-1', Notification, { message: 'Item collected!' }, { zIndex: 10 });
 ```
 
-- Only one overlay can be active at a time; a new overlay replaces the previous one.
-- The overlay does **not** modify `currentPath`.
-- Performing `skip` / `back` / `gotoScreen` **automatically closes** the overlay.
+| Parameter | Type                          | Description                                      |
+| --------- | ----------------------------- | ------------------------------------------------ |
+| id        | `string`                      | Unique identifier for this overlay               |
+| component | `React.ComponentType`         | Overlay component (must be registered)           |
+| params    | `React.ComponentProps<C>`     | Props passed to the overlay                      |
+| options   | `OpenOverlayOptions`          | Optional: `{ activate?: boolean, zIndex?: number }` |
+
+**Options**:
+- `activate` — Whether to activate the overlay immediately (default `true`). Inactive overlays render but don't receive keyboard events.
+- `zIndex` — Visual stacking order. Smaller values render behind larger values. Defaults to the current overlay count.
+
+**Key points**:
+- Multiple overlays can be open simultaneously, each with a unique ID.
+- Overlays do **not** modify `currentPath`.
+- Performing `skip` / `back` / `gotoScreen` **automatically closes all** overlays.
+- Reusing an existing ID throws an error.
 
 ---
 
 ### `closeOverlay`
 
 ```tsx
-closeOverlay();
+closeOverlay(id);
 ```
 
-Close the currently active overlay.
+Close a specific overlay by its ID.
+
+```tsx
+closeOverlay('pause-1');
+```
+
+Throws if no overlay with the given ID exists.
+
+---
+
+### `closeAllOverlays`
+
+```tsx
+closeAllOverlays();
+```
+
+Close all open overlays at once.
+
+---
+
+### `activateOverlay`
+
+```tsx
+activateOverlay(id);
+```
+
+Activate an overlay by its ID so it starts receiving keyboard events.
+
+Throws if no overlay with the given ID exists.
+
+---
+
+### `deactivateOverlay`
+
+```tsx
+deactivateOverlay(id);
+```
+
+Deactivate an overlay by its ID so it stops receiving keyboard events while staying visible.
+
+Throws if no overlay with the given ID exists.
 
 ---
 
 ### Module-Level Functions
 
-`skip`, `back`, `gotoScreen`, `overlay`, and `closeOverlay` can also be used as **module-level imports** without a React component context.
+`skip`, `back`, `gotoScreen`, `openOverlay`, `closeOverlay`, `closeAllOverlays`, `activateOverlay`, and `deactivateOverlay` can also be used as **module-level imports** without a React component context.
 
 ```tsx
-import { skip, back, gotoScreen, overlay, closeOverlay } from '@baigao_h/ink-kit';
+import { skip, back, gotoScreen, openOverlay, closeOverlay } from '@baigao_h/ink-kit';
 
 // Use anywhere in .ts/.tsx files
 skip(Game, { level: 5 });
+openOverlay('pause', PauseMenu, {});
+closeOverlay('pause');
 ```
 
 **Note**: Module-level functions require `<ScenarioManagementProvider>` to be mounted. Calling them before the provider is mounted throws an error.
@@ -262,11 +327,12 @@ skip(Game, { level: 5 });
 
 ## Type Safety
 
-All navigation functions are type-safe — `skip`, `gotoScreen`, and `overlay` automatically infer prop types from your component:
+All navigation functions are type-safe — `skip`, `gotoScreen`, and `openOverlay` automatically infer prop types from your component:
 
 ```tsx
 // Ok — type checks
 skip(Game, { level: 1 });
+openOverlay('dialog', ConfirmDialog, { message: 'Are you sure?' });
 
 // Type error: Game has no `title` prop
 skip(Game, { title: 'hello' });
@@ -283,3 +349,7 @@ skip(Game, { title: 'hello' });
  "xxx" is not a child of "yyy".                               | `skip` target is not a direct child of the current screen |
  back() failed: already at root node, cannot go back.          | `back` was called at the root                 |
  skip() called before Provider was mounted.                    | Module-level function called before the provider was mounted |
+ Overlay with id "xxx" already exists.                        | `openOverlay` called with an ID that is already in use |
+ Cannot close overlay "xxx": no overlay with that ID exists.   | `closeOverlay` called with an unknown ID       |
+ Cannot activate overlay "xxx": no overlay with that ID exists. | `activateOverlay` called with an unknown ID    |
+ Cannot deactivate overlay "xxx": no overlay with that ID exists. | `deactivateOverlay` called with an unknown ID  |

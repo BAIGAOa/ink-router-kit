@@ -233,6 +233,15 @@ function buildPathFrom(
   return path;
 }
 
+/**
+ * Pure reducer for {@link ScreenState}.
+ *
+ * Handles all navigation actions: skip (down), back (up), gotoScreen
+ * (cross-branch), openOverlay, closeOverlay, closeAllOverlays,
+ * activateOverlay, and deactivateOverlay.
+ *
+ * Navigation actions (skip / back / gotoScreen) clear all open overlays.
+ */
 function screenReducer(state: ScreenState, action: ScreenAction): ScreenState {
   switch (action.type) {
 

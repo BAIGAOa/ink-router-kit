@@ -43,6 +43,18 @@ export function useKeyboard(): KeyboardContextValue {
   return ctx;
 }
 
+/**
+ * Subscribe to the focus state of a named focus target.
+ *
+ * Returns `true` when the target with the given `focusId` is the currently
+ * active focus target on the current screen layer, `false` otherwise.
+ *
+ * Re-renders the component when the focus target changes (via Tab,
+ * `focusSet`, `focusNext`, `focusPrev`, or `focusUnregister`).
+ *
+ * @param focusId The focus target id to watch.
+ * @returns Whether the named target is currently focused.
+ */
 export function useFocusState(focusId: string): boolean {
   const { focusCurrent, subscribeFocus } = useKeyboard();
   const [isFocused, setIsFocused] = useState<boolean>(
