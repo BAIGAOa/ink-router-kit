@@ -15,51 +15,58 @@ npm run test:watch  # vitest
 npm run clean       # rm -rf dist
 ```
 
-## Layout
-- `src/screen/` — tree-based screen navigation: register, skip, back, gotoScreen, overlay
-- `src/keyboard/` — layered keyboard events with focus management and shortcut actions
-- `src/components/` — SelectInput, MultiSelectInput, TextInput, NumberInput, SearchInput, ConfirmDialog, Spinner, ProgressBar, Divider, Badge, KeyHint, Tabs, Fold, Form (Field + context)
-- `src/storage/` — typed JSON key-value persistence (`createStorage`)
-- `src/binary-storage/` — sequential binary FIFO persistence (`createBinaryStorage`)
-- `src/cli/` — ink-kit CLI (init, initTheme, makeLanguageType, makeThemeType)
-- `src/language/` — i18n: `LanguageProvider` + `useI18n` hook
-- `src/theme/` — theming: `ThemeProvider` + `useTheme` hook
-- `src/index.ts` — public API barrel export
-- `src/__tests__/` — tests organized by subsystem
-- `dist/` — build output (.gitignored)
+Layout
 
-## Architecture
+· src/screen/ — tree-based screen navigation: register, skip, back, gotoScreen, overlay
+· src/keyboard/ — layered keyboard events with focus management and shortcut actions
+· src/components/ — SelectInput, MultiSelectInput, TextInput, NumberInput, SearchInput, ConfirmDialog, Spinner, ProgressBar, Divider, Badge, KeyHint, Tabs, Fold, Form (Field + context)
+· src/storage/ — typed JSON key-value persistence (createStorage)
+· src/binary-storage/ — sequential binary FIFO persistence (createBinaryStorage)
+· src/cli/ — ink-kit CLI (init, initTheme, makeLanguageType, makeThemeType)
+· src/language/ — i18n: LanguageProvider + useI18n hook
+· src/theme/ — theming: ThemeProvider + useTheme hook
+· src/index.ts — public API barrel export
+· src/__tests__/ — tests organized by subsystem
+· dist/ — build output (.gitignored)
 
-**Screen System** (`src/screen/`)
-- Tree-based navigation via `registerComponent(Component, template, { parent })`.
-- Navigation: `skip()` (down to child), `back()` (up to parent, supports `levels`), `gotoScreen()` (jump via LCA), `overlay()` / `closeOverlay()` (floating dialogs).
-- All nav functions work as React hooks and as module-level imports (`_dispatchers` Set).
-- `ScenarioManagementProvider` wraps the app; `CurrentScreen` renders the active screen.
+Architecture
 
-**Keyboard System** (`src/keyboard/`)
-- `KeyboardProvider` MUST be nested inside `ScenarioManagementProvider`.
-- Priority chain: `globalKeys(affectOverlay:true)` → overlay → `globalKeys(affectOverlay:false)` → screen stack (top to bottom).
-- Key mechanisms: `boundKeyboard()` (per-screen), `blockedKey()` (pass-through, confusingly named), `stop()`, `globalKeys()`.
-- Focus: `useFocusState(focusId)`, Tab/Shift+Tab cycling, `focusSet/focusNext/focusPrev/focusUnregister`.
-- Shortcut actions: `defineShortcutAction/addAction/hasAction/removeAction/modifyAction`.
+Screen System (src/screen/)
 
-**Component Library** (`src/components/`)
-- 14 components, each in its own folder. All interactive ones use `focusId`.
-- Form system (`Form` + `Field` + `useFormContext`) with validation context, Ctrl+Enter submit.
+· Tree-based navigation via registerComponent(Component, template, { parent }).
+· Navigation: skip() (down to child), back() (up to parent, supports levels), gotoScreen() (jump via LCA), overlay() / closeOverlay() (floating dialogs).
+· All nav functions work as React hooks and as module-level imports (_dispatchers Set).
+· ScenarioManagementProvider wraps the app; CurrentScreen renders the active screen.
 
-## Test Conventions
-- `*.test.tsx` — jsdom via `@testing-library/react`; mock `useInput` to capture+dispatch synthetic keys.
-- `*.ink.test.ts(x)` — node env via `ink-testing-library` for real Ink rendering.
-- `clearRegistry()` in `beforeEach`; `clearDispatchers()` for module-level nav isolation.
-- Test config in `vitest.config.ts` — default jsdom, `environmentMatchGlobs` for `.ink.test.*` → node.
+Keyboard System (src/keyboard/)
 
-## Coding Conventions
+· KeyboardProvider MUST be nested inside ScenarioManagementProvider.
+· Priority chain: globalKeys(affectOverlay:true) → overlay → globalKeys(affectOverlay:false) → screen stack (top to bottom).
+· Key mechanisms: boundKeyboard() (per-screen), blockedKey() (pass-through, confusingly named), stop(), globalKeys().
+· Focus: useFocusState(focusId), Tab/Shift+Tab cycling, focusSet/focusNext/focusPrev/focusUnregister.
+· Shortcut actions: defineShortcutAction/addAction/hasAction/removeAction/modifyAction.
 
-### JSX over React.createElement
-New components MUST use JSX. Existing `React.createElement` in SelectInput and MultiSelectInput defaults is legacy — do NOT use it for new code.
+Component Library (src/components/)
 
-### Focus target lifecycle
-Separate `focusUnregister` from the keyboard binding `useEffect`. The binding effect may re-run on value changes; `focusUnregister` only on unmount.
+· 14 components, each in its own folder. All interactive ones use focusId.
+· Form system (Form + Field + useFormContext) with validation context, Ctrl+Enter submit.
+
+Test Conventions
+
+· *.test.tsx — jsdom via @testing-library/react; mock useInput to capture+dispatch synthetic keys.
+· *.ink.test.ts(x) — node env via ink-testing-library for real Ink rendering.
+· clearRegistry() in beforeEach; clearDispatchers() for module-level nav isolation.
+· Test config in vitest.config.ts — default jsdom, environmentMatchGlobs for .ink.test.* → node.
+
+Coding Conventions
+
+JSX over React.createElement
+
+New components MUST use JSX. Existing React.createElement in SelectInput and MultiSelectInput defaults is legacy — do NOT use it for new code.
+
+Focus target lifecycle
+
+Separate focusUnregister from the keyboard binding useEffect. The binding effect may re-run on value changes; focusUnregister only on unmount.
 
 ```tsx
 const focusIdRef = useRef(focusId);
@@ -74,7 +81,8 @@ useEffect(() => {
 }, [value]);
 ```
 
-### Callback refs in empty-deps effects
+Callback refs in empty-deps effects
+
 ```tsx
 const onCancelRef = useRef(onCancel);
 onCancelRef.current = onCancel;
@@ -83,42 +91,156 @@ useEffect(() => {
 }, []);
 ```
 
-### Defaults for prop accessors
-All props accessed via `.length` / `.map()` must have runtime defaults:
+Defaults for prop accessors
+
+All props accessed via .length / .map() must have runtime defaults:
+
 ```tsx
 function KeyHint({ keys = [] }: Props) { ... }
 function TextInput({ value = '' }: Props) { ... }
 ```
 
-### globalKeys mode
-Use `{ mode: 'add' }` when registering alongside other consumers. Default (replace) silently deletes entries from other components.
+globalKeys mode
 
-### Mount guard for async operations
+Use { mode: 'add' } when registering alongside other consumers. Default (replace) silently deletes entries from other components.
+
+Mount guard for async operations
+
 ```tsx
 const mountedRef = useRef(true);
 useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 ```
 
-### No decorative delimiter comments
-Don't use banner comments (`// ──`). Explain **why**, not territory. Extract long sections into functions/files.
+Hook encapsulation rule
 
-### Public API requires JSDoc in English
-Every export in `src/index.ts` and every public type/function needs JSDoc describing **what** and **when to use it**. Internal helpers can omit.
+When the same useEffect + useRef pattern appears in 3+ components, extract it into a custom hook. (Note: the focusUnregister pattern exists in 8+ components but hasn't been extracted yet — a candidate for useFocusLifecycle.)
 
-### Hook encapsulation rule
-When the same `useEffect` + `useRef` pattern appears in 3+ components, extract it into a custom hook. (Note: the `focusUnregister` pattern exists in 8+ components but hasn't been extracted yet — a candidate for `useFocusLifecycle`.)
+Test philosophy
 
-### Test philosophy
-Target **specific behaviors** that could break: edge cases, failure modes, state transitions, regressions. No "happy tests" that never fail. Cover real user flows, not line counts.
+Target specific behaviors that could break: edge cases, failure modes, state transitions, regressions. No "happy tests" that never fail. Cover real user flows, not line counts.
 
-## Watch out for
-- `blockedKey` means **pass-through** (penetration), NOT "block". Makes keys transparent to lower layers.
-- `_dispatch` is set in `useEffect` — unavailable during `componentDidCatch`. Error boundaries calling `overlay()` will find `_dispatch` is `null`.
-- `clearShortcutOperations` is a no-op at module level — keyboard state is per-instance via `useRef`.
-- `ScenarioManagementProvider` nested first, then `KeyboardProvider` inside it. Reversed silently breaks keyboard.
-- Overlay auto-closes on `skip`/`back`/`gotoScreen` (handled in reducer).
-- Double `<` in TSX generics: `useRef<<T>` is parsed as JSX — must be `useRef<T>` (single).
+Comment conventions
 
-## CI/CD
-- GitHub CI: `npm ci` → `npm run build` → `npm test` on Node 22 & 24 for pushes/PRs to `main` and tags.
-- On GitHub release publish: idempotency check → `npm publish --access public`.
+1. No decorative comments or separators
+
+Do not use any comments that serve only visual decoration or code sectioning. This includes but is not limited to:
+
+· // ==================
+· // ---------------------
+· // ── or // ══
+· Any line consisting of repeated characters intended as a visual divider.
+
+Comments must explain why the code is written a certain way, not restate what the code does (the code itself already says “what”).
+
+✅ Correct (explains why)
+
+```ts
+// We use a ref here because the callback must be stable across re-renders,
+// but the actual value may change. Storing it in a ref prevents unnecessary
+// re-binding of the keyboard handler.
+const onCancelRef = useRef(onCancel);
+```
+
+❌ Wrong (decorative separator)
+
+```ts
+// ─────────────────────────────────────────────
+// Component rendering
+// ─────────────────────────────────────────────
+```
+
+❌ Wrong (states “what”)
+
+```ts
+// Set the value to 42
+setValue(42);
+```
+
+2. Comments must explain “why”, not “what”
+
+When the intent of the code is not obvious or involves non‑trivial design decisions, add a comment explaining why it is implemented that way. If the code is already self‑explanatory (through good naming and structure), the comment can be omitted.
+
+✅ Correct (explains design decision)
+
+```ts
+// We cannot use the regular `focusSet` here because the overlay may not
+// be mounted yet. Instead, we defer focus via a ref.
+deferredFocusRef.current = focusId;
+```
+
+❌ Wrong (repeats code information)
+
+```ts
+// Increment the counter
+counter++;
+```
+
+3. Internal implementation details must have clear, useful comments
+
+For complex logic, non‑obvious edge cases, performance optimisations, or concurrency controls, always add comments explaining the underlying principles and important caveats.
+
+✅ Correct (explains internal complexity)
+
+```ts
+// The write queue is a promise chain. We use `.then(task, task)` so that
+// even if a previous write rejects, the next write still executes.
+// Without the second argument, a rejection would break the chain forever.
+this.pending = this.pending.then(task, task);
+```
+
+4. Public API must have English JSDoc comments
+
+Every public function, component, type, or constant exported from src/index.ts must have an English JSDoc comment that includes:
+
+· A short description of what the API does
+· Parameter descriptions (@param)
+· Return value description (@returns)
+· Possible errors thrown (@throws)
+· Usage example (@example, when necessary)
+· Boundary behaviour (e.g., behaviour when a certain parameter is undefined)
+
+✅ Correct (complete public API JSDoc)
+
+```ts
+/**
+ * Register a component as a screen in the navigation tree.
+ *
+ * @param component - The React component (used as the unique token).
+ * @param template  - Default props for the component.
+ * @param options   - Optional registration options (e.g. `parent`).
+ * @throws {Error} If the component has already been registered.
+ * @example
+ * ```tsx
+ * registerComponent(Menu, {});
+ * registerComponent(Game, { level: 1 }, { parent: Menu });
+ *```
+
+*/
+export function registerComponent<C extends React.ComponentType<any>>(
+component: C,
+template: React.ComponentProps<C>,
+options?: RegisterOptions,
+): void;
+
+```
+
+❌ **Wrong (missing or one‑line comment)**
+```ts
+// Register a component
+export function registerComponent(...) { ... }
+```
+
+Watch out for
+
+· blockedKey means pass-through (penetration), NOT "block". Makes keys transparent to lower layers.
+· _dispatch is set in useEffect — unavailable during componentDidCatch. Error boundaries calling overlay() will find _dispatch is null.
+· clearShortcutOperations is a no-op at module level — keyboard state is per-instance via useRef.
+· ScenarioManagementProvider nested first, then KeyboardProvider inside it. Reversed silently breaks keyboard.
+· Overlay auto-closes on skip/back/gotoScreen (handled in reducer).
+· Double < in TSX generics: useRef<<T> is parsed as JSX — must be useRef<T> (single).
+
+CI/CD
+
+· GitHub CI: npm ci → npm run build → npm test on Node 22 & 24 for pushes/PRs to main and tags.
+· On GitHub release publish: idempotency check → npm publish --access public.
+
