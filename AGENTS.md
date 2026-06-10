@@ -133,9 +133,39 @@ If the user’s description is unclear, ambiguous, or missing details, load the 
 
 Coding Conventions
 
-JSX over React.createElement
+JSX is mandatory; React.createElement is forbidden
 
-New components MUST use JSX. Existing React.createElement in SelectInput and MultiSelectInput defaults is legacy — do NOT use it for new code.
+All new code MUST use JSX syntax. The legacy React.createElement calls that exist in a few components (e.g., SelectInput, MultiSelectInput defaults) are historical and will not be rewritten, but do not introduce new createElement usages.
+
+✅ Correct (JSX)
+
+```tsx
+return (
+  <Box flexDirection="column">
+    <Text>Hello</Text>
+  </Box>
+);
+```
+
+❌ Wrong (React.createElement)
+
+```tsx
+return React.createElement(Box, { flexDirection: 'column' },
+  React.createElement(Text, null, 'Hello')
+);
+```
+
+No over‑engineering / premature optimisation
+
+· Do not add abstractions, design patterns, or performance optimisations “just in case”. Write the simplest code that makes the tests pass.
+· Avoid creating generic utilities, hooks, or components until the same pattern appears at least three times. Two similar usages may be coincidental; wait for the third to justify extraction.
+· Do not optimise for hypothetical future requirements. Only optimise based on measured performance issues.
+· If you believe a refactor or optimisation is genuinely needed (e.g., a component has become too large, a repeated pattern now appears three times, or a performance issue is identified), you MUST ask the user for permission first. Do not assume the user wants it, even if it seems obvious.
+
+How to ask:
+“I noticed that [describe the issue]. I think we could [proposed refactor/optimisation]. This would [benefit]. Should I proceed with this change?”
+
+Wait for explicit approval (e.g., “yes”, “go ahead”, “do it”) before making any non‑trivial structural change or optimisation.
 
 Focus target lifecycle
 
