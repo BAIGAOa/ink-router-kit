@@ -136,7 +136,9 @@ function checkGlobalKey(
   }
 
   const topLayer = layersRef.current.get(topComponent);
-  if (topLayer) {
+  // Screen stack cannot override global keys that target overlays
+  // (affectOverlay:true + cover:true): only overlays can override those.
+  if (topLayer && !(entry.affectOverlay && (entry.cover ?? true))) {
     if (keyNames.some((k) => topLayer.globalKeyOverrides.has(k))) return false;
   }
 
@@ -527,31 +529,47 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           const matchingKeys = gkKeys.filter((k) => keys.includes(k));
           if (matchingKeys.length === 0) continue;
 
+          const isOverlayOwner = typeof owner === 'string';
           const cat = gk.category;
           let inCategory = false;
 
           // Category applies to screen components, not overlay IDs
-          if (typeof owner !== 'string') {
+          if (!isOverlayOwner) {
             if (cat === undefined || cat === '*') {
               inCategory = true;
             } else if (Array.isArray(cat)) {
               inCategory = cat.includes(owner);
             }
+            if (!inCategory) continue;
           }
 
-          // For overlay owners, category checks are skipped (overlays don't override global keys by category)
-          if (typeof owner === 'string' && matchingKeys.length > 0) continue;
-
-          if (!inCategory) continue;
-
           const cover = gk.cover ?? true;
-          if (!cover) {
-            const ownerName = typeof owner === 'string' ? owner : (owner.displayName || owner.name || 'anonymous');
-            throw new Error(
-              `[Ink-Router-Kit] Component "${ownerName}" ` +
-              `attempted to bind "${matchingKeys[0]}" via ${bindingContext}, ` +
-              `but this key is already declared in globalKeys with cover: false, so overriding is not allowed.`,
-            );
+          const affectOverlay = gk.affectOverlay ?? false;
+
+          if (isOverlayOwner) {
+            // Overlay owners can only override global keys that target overlays
+            // (affectOverlay: true). Non-affectOverlay global keys fire after
+            // overlays in step 3, so overlays don't need to override them.
+            if (!affectOverlay) continue;
+            if (!cover) {
+              throw new Error(
+                `[Ink-Router-Kit] Overlay "${owner}" ` +
+                `attempted to bind "${matchingKeys[0]}" via ${bindingContext}, ` +
+                `but this key is already declared in globalKeys with cover: false, so overriding is not allowed.`,
+              );
+            }
+          } else {
+            // Screen owners cannot override global keys that target overlays.
+            // Only overlays themselves can override those (the check above).
+            if (affectOverlay) continue;
+            if (!cover) {
+              const ownerName = owner.displayName || owner.name || 'anonymous';
+              throw new Error(
+                `[Ink-Router-Kit] Component "${ownerName}" ` +
+                `attempted to bind "${matchingKeys[0]}" via ${bindingContext}, ` +
+                `but this key is already declared in globalKeys with cover: false, so overriding is not allowed.`,
+              );
+            }
           }
 
           for (const k of matchingKeys) {

@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, act } from '@testing-library/react';
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useContext } from 'react';
 import { registerComponent, clearRegistry } from '../../screen/registry.js';
 import { ScenarioManagementProvider } from '../../screen/provider.js';
 import { useScreenSystem } from '../../screen/hook.js';
+import { CurrentScreen } from '../../screen/current-screen.js';
+import { OverlayContext } from '../../screen/OverlayContext.js';
 import { KeyboardProvider } from '../../keyboard/provider.js';
 import { useKeyboard, useFocusState } from '../../keyboard/hook.js';
 import type { Key } from 'ink';
@@ -52,6 +54,21 @@ function Notification({ message }: { message: string }) {
 }
 Notification.displayName = 'Notification';
 
+// Overlay component that actually calls boundKeyboard from within its
+// own useEffect so that the binding is registered on the overlay layer
+// (owner = overlay ID string). Enables testing overlay global key overrides.
+function BindingOverlay({ boundKey, onBound }: { boundKey: string; onBound?: () => void }) {
+  const overlayId = useContext(OverlayContext);
+  const { closeOverlay: cl } = useScreenSystem();
+  const { boundKeyboard } = useKeyboard();
+  useEffect(() => {
+    boundKeyboard([boundKey], () => onBound?.());
+    boundKeyboard(['escape'], () => cl(overlayId!));
+  }, []);
+  return React.createElement('div', null, boundKey);
+}
+BindingOverlay.displayName = 'BindingOverlay';
+
 beforeEach(() => {
   clearRegistry();
   capturedInputHandler = null;
@@ -59,6 +76,7 @@ beforeEach(() => {
   registerComponent(GameLevel, { level: 1 }, { parent: Menu });
   registerComponent(Combat, { enemy: 'goblin' }, { parent: GameLevel });
   registerComponent(Notification, { message: '' });
+  registerComponent(BindingOverlay, { boundKey: 'q' });
 });
 
 afterEach(() => {
@@ -83,7 +101,7 @@ function renderKeyboardTree(
       kbRef.current = kb;
       scRef.current = sc;
     }, [kb, sc]);
-    return React.createElement('div', null);
+    return React.createElement(CurrentScreen);
   }
 
   render(
@@ -754,9 +772,8 @@ describe('globalKeys + overlay 覆盖', () => {
       { key: 'q', operate: globalCb, affectOverlay: true, cover: true },
     ]);
 
-    // 打开 overlay 并绑定 q 到 overlay
-    act(() => getScreen()!.openOverlay('test-ovl', Notification, { message: 'test' }));
-    getKeyboard()!.boundKeyboard(['q'], overlayCb);
+    // 打开 overlay，组件内部调用 boundKeyboard 绑定到 overlay 层
+    act(() => getScreen()!.openOverlay('test-ovl', BindingOverlay, { boundKey: 'q', onBound: overlayCb }));
 
     // overlay 的绑定优先
     pressKey('q', {});
@@ -766,7 +783,6 @@ describe('globalKeys + overlay 覆盖', () => {
 
   it('affectOverlay=true & cover=false → overlay 无法覆盖全局键', () => {
     const globalCb = vi.fn();
-    const overlayCb = vi.fn();
     const { getKeyboard, getScreen } = renderKeyboardTree(Menu);
 
     // 注册全局键 q，cover: false 禁止覆盖
@@ -774,10 +790,9 @@ describe('globalKeys + overlay 覆盖', () => {
       { key: 'q', operate: globalCb, affectOverlay: true, cover: false },
     ]);
 
-    act(() => getScreen()!.openOverlay('test-ovl', Notification, { message: 'test' }));
-    // 尝试绑定 q 会抛错
+    // 打开 overlay，组件内部尝试绑定 q 会抛错（cover: false 禁止覆盖）
     expect(() =>
-      getKeyboard()!.boundKeyboard(['q'], overlayCb),
+      act(() => getScreen()!.openOverlay('test-ovl', BindingOverlay, { boundKey: 'q' })),
     ).toThrow('cover: false');
 
     // 全局键仍然触发
