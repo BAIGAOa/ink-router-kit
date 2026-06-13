@@ -141,9 +141,21 @@ function checkGlobalKey(
   }
 
   const topLayer = layersRef.current.get(topComponent);
-  // Screen stack cannot override global keys that target overlays
-  // (affectOverlay:true + cover:true): only overlays can override those.
-  if (topLayer && !(entry.affectOverlay && (entry.cover ?? true))) {
+
+  
+  // In our design expectations,  
+  // Only when affectOverlay is false and cover is true in the options of a Global Key can it be overwritten by Screen Stack  
+  // The following are the behaviors that result from all combinations:  
+  // When affectOverlay: true and cover: true, Screen Stack cannot overwrite, but Overlay Level can. If no Overlay is active, this Global Key will become invalid  
+  // When affectOverlay: true and cover: false, neither Screen Stack nor Overlay Level can overwrite this Global Key, but it can still affect Overlay Level. Similarly, when no Overlay is active, this Global Key will also become invalid  
+  // When affectOverlay: false and cover: true, this Global Key cannot affect Overlay Level, and naturally Overlay Level cannot overwrite it. However, it still takes effect on Screen Stack, and Screen Stack can overwrite it  
+  // When affectOverlay: false and cover: false, this Global Key cannot affect Overlay Level nor be overwritten by Screen Stack  
+  //  
+  // NOTE: When you enable options.executeWhenNoOverlay and affectOverlay is true (if affectOverlay is not true, enabling executeWhenNoOverlay is meaningless),  
+  // this Global Key will also take effect on Screen Stack when no Overlay is active. Please **note**! It does not affect the overwrite mechanism of cover. In this case, Screen Stack still cannot overwrite this Global Key  
+  // cover is only affected by affectOverlay
+  // @2026-06-14 version 3.3.0
+  if (topLayer && !entry.affectOverlay && (entry.cover ?? true)) {
     if (keyNames.some((k) => topLayer.globalKeyOverrides.has(k))) return false;
   }
 
