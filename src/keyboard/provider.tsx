@@ -254,6 +254,9 @@ function handleLayer(
   isOverlay: boolean,
   wildcardFirst: boolean,
 ): boolean {
+  // The reason it has the highest priority is to ensure that tab/shift+tab have the highest priority, avoiding conflicts with business-bound actions.  
+  // However, when there is no Focus Target in the Current Screen, handleTabNavigation will return false, which allows users to retain flexibility. When tab/shift+tab do not need to be enforced,  
+  // they can also be bound to business-specific keys.
   if (isTop && handleTabNavigation(layer, eventNames, key.shift, notifyFocusChange)) return true;
 
   const blocked = layer.blockedKeys;
