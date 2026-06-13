@@ -13,6 +13,7 @@ import {
   BoundKeyEntry,
   ScreenKeyboardLayer,
   GlobalKeyEntry,
+  GlobalSequenceEntry,
   BlockedKeyOptions,
   StopOptions,
   ShortcutOperationEntry,
@@ -482,6 +483,21 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   }[]>([]);
   const focusSubscribersRef = useRef(new Set<() => void>());
   const wildcardPriorityCountRef = useRef<number>(0);
+
+  // Global sequence state: registered entries and current pending state.
+  const globalSequencesRef = useRef<GlobalSequenceEntry[]>([]);
+  const globalPendingSeqRef = useRef<{
+    sequences: string[];
+    nextIndex: number;
+    handler: () => void;
+    timer: NodeJS.Timeout;
+    timeout: number;
+    exclusive: boolean;
+    affectOverlay: boolean;
+    cover: boolean;
+    category?: React.ComponentType<any>[] | "*";
+    executeWhenNoOverlay?: boolean;
+  } | null>(null);
 
   const shortcutOperationsRef = useRef(
     new Map<string, { action: () => void; keys?: string[] }>()
@@ -1015,6 +1031,41 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           '[Ink-Router-Kit] boundSequence() requires at least 2 keys in the sequence.'
         )
       }
+
+      // Check global sequence cover constraints. Only boundSequence can
+      // override a global sequence; when cover: false, attempting to
+      // bind a sequence whose first key matches a global sequence with
+      // the same first key is forbidden.
+      //
+      // Screen owners: checked against all global sequences in their
+      // category. Overlay owners: only checked against affectOverlay:true
+      // global sequences (affectOverlay:false global sequences fire after
+      // overlays, so overlays don't need to override them).
+      // @2026-06-13 v3.2.0
+      const isOverlayOwner = typeof owner === 'string';
+      const firstKey = keys[0];
+      for (const gs of globalSequencesRef.current) {
+        if (gs.cover !== false) continue;
+        if (gs.keys[0] !== firstKey) continue;
+        if (isOverlayOwner) {
+          // Overlay owners can only override affectOverlay:true global sequences.
+          if (!(gs.affectOverlay ?? false)) continue;
+        } else {
+          // Screen owners: category check.
+          const cat = gs.category;
+          if (cat !== undefined && cat !== '*') {
+            if (Array.isArray(cat) && !cat.includes(owner)) continue;
+          }
+        }
+        const ownerName = isOverlayOwner ? owner : (owner.displayName || owner.name || 'anonymous');
+        throw new Error(
+          `[Ink-Router-Kit] ${isOverlayOwner ? `Overlay "${ownerName}"` : `Component "${ownerName}"`} ` +
+          `attempted to bind sequence [${keys.join(', ')}] via boundSequence, ` +
+          `but the first key "${firstKey}" is already declared in globalSequence ` +
+          `with cover: false, so overriding is not allowed.`,
+        );
+      }
+
       const layer = getLayer(owner);
 
       const binding: SequenceBinding = {
@@ -1024,7 +1075,6 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         options,
       };
 
-      const firstKey = keys[0];
       const existing = layer.sequences.get(firstKey) || [];
       existing.push(binding);
       layer.sequences.set(firstKey, existing);
@@ -1178,6 +1228,37 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     [],
   );
 
+  /**
+   * Register global sequence key bindings.
+   *
+   * Validates each entry (keys length ≥ 2), clears any active global pending
+   * sequence on replace, and stores entries for evaluation in the useInput
+   * event chain.
+   */
+  const globalSequence = useCallback(
+    (entries: GlobalSequenceEntry[], options?: { mode?: 'replace' | 'add' }) => {
+      for (const entry of entries) {
+        if (entry.keys.length < 2) {
+          throw new Error(
+            '[Ink-Router-Kit] globalSequence() requires at least 2 keys per sequence.',
+          );
+        }
+      }
+
+      if (options?.mode === 'add') {
+        globalSequencesRef.current = [...globalSequencesRef.current, ...entries];
+      } else {
+        // Clear any active pending sequence when replacing all entries.
+        if (globalPendingSeqRef.current) {
+          clearTimeout(globalPendingSeqRef.current.timer);
+          globalPendingSeqRef.current = null;
+        }
+        globalSequencesRef.current = entries;
+      }
+    },
+    [],
+  );
+
   const defineShortcutAction = useCallback((entries: ShortcutOperationEntry[]) => {
     for (const each of entries) {
       if (shortcutOperationsRef.current.has(each.actionId)) {
@@ -1232,6 +1313,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       blockedKey: penetration,
       stop,
       globalKeys,
+      globalSequence,
       focusSet,
       focusNext,
       focusPrev,
@@ -1254,6 +1336,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       penetration,
       stop,
       globalKeys,
+      globalSequence,
       focusSet,
       focusNext,
       focusPrev,
@@ -1278,10 +1361,141 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     const path = pathRef.current;
     const topComponent = path.length > 0 ? path[path.length - 1] : null;
     const globalKeys = globalKeysRef.current;
+    const globalSequences = globalSequencesRef.current;
     const activeIds = activeOverlayIdsRef.current;
     const overlays = displayedOverlaysRef.current;
     const activeOverlays = overlays.filter(n => activeIds.has(n.id))
     const activeCount = activeIds.size;
+    const DEFAULT_SEQ_TIMEOUT = 500;
+
+    // Try to start a global pending sequence from an affectOverlay group.
+    // Evaluates executeWhenNoOverlay, category whitelist, and cover overrides
+    // (only boundSequence can override a global sequence, via the layer's
+    // sequences map keyed by first key). When all checks pass and the first
+    // key matches, creates a pending state with a timeout timer.
+    //
+    // Returns true when the event was consumed (first key matched).
+    // @2026-06-13 v3.2.0
+    const tryStartGlobalSequence = (
+      entries: GlobalSequenceEntry[],
+      affectOverlay: boolean,
+    ): boolean => {
+      for (const entry of entries) {
+        if ((entry.affectOverlay ?? false) !== affectOverlay) continue;
+        // executeWhenNoOverlay only applies to affectOverlay:true entries.
+        // affectOverlay:false sequences always work on the screen stack.
+        if (affectOverlay && activeCount === 0 && !entry.executeWhenNoOverlay) continue;
+        if (!topComponent) continue;
+
+        const cat = entry.category;
+        if (cat !== undefined && cat !== '*') {
+          if (Array.isArray(cat) && cat.length === 0) continue;
+          if (Array.isArray(cat) && !cat.includes(topComponent)) continue;
+        }
+
+        // Cover check: only boundSequence can override a global sequence.
+        // boundKeyboard is never checked — its keys are single-key bindings
+        // that the sequence system always consumes first.
+        if (entry.cover !== false) {
+          const firstKey = entry.keys[0];
+          if (affectOverlay) {
+            let anyOverlayHasOverride = false;
+            for (const overlay of activeOverlays) {
+              const overlayLayer = layersRef.current.get(overlay.id);
+              if (overlayLayer?.sequences.has(firstKey)) {
+                anyOverlayHasOverride = true;
+                break;
+              }
+            }
+            if (anyOverlayHasOverride) continue;
+          } else {
+            if (topComponent) {
+              const topLayer = layersRef.current.get(topComponent);
+              if (topLayer?.sequences.has(firstKey)) continue;
+            }
+          }
+        }
+
+        if (eventNames.includes(entry.keys[0])) {
+          const timeout = entry.timeout ?? DEFAULT_SEQ_TIMEOUT;
+          const pending = {
+            sequences: entry.keys,
+            nextIndex: 1,
+            handler: entry.operate,
+            timer: undefined as unknown as NodeJS.Timeout,
+            timeout,
+            exclusive: entry.exclusive ?? false,
+            affectOverlay,
+            cover: entry.cover ?? true,
+            category: entry.category,
+            executeWhenNoOverlay: entry.executeWhenNoOverlay,
+          };
+          const timer = setTimeout(() => {
+            if (globalPendingSeqRef.current === pending) {
+              globalPendingSeqRef.current = null;
+            }
+          }, timeout);
+          pending.timer = timer;
+          globalPendingSeqRef.current = pending;
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // Process the currently active global pending sequence.
+    // Matches the next expected key, handles exclusive vs non-exclusive
+    // mismatch behaviour, and fires the handler when the full sequence
+    // is completed.
+    //
+    // Returns true when the event was consumed by the pending sequence.
+    // @2026-06-13 v3.2.0
+    const processGlobalPending = (): boolean => {
+      const pending = globalPendingSeqRef.current;
+      if (pending === null) return false;
+
+      // When no overlays are active and executeWhenNoOverlay is false,
+      // an affectOverlay:true pending sequence should be cancelled.
+      // affectOverlay:false sequences are unaffected by overlay count.
+      if (pending.affectOverlay && activeCount === 0 && !pending.executeWhenNoOverlay) {
+        clearTimeout(pending.timer);
+        globalPendingSeqRef.current = null;
+        return false;
+      }
+
+      const expectedKey = pending.sequences[pending.nextIndex];
+      if (eventNames.includes(expectedKey)) {
+        clearTimeout(pending.timer);
+        pending.nextIndex++;
+        if (pending.nextIndex === pending.sequences.length) {
+          pending.handler();
+          globalPendingSeqRef.current = null;
+        } else {
+          pending.timer = setTimeout(() => {
+            if (globalPendingSeqRef.current === pending) {
+              globalPendingSeqRef.current = null;
+            }
+          }, pending.timeout);
+        }
+        return true;
+      }
+
+      if (pending.exclusive) {
+        // Exclusive mode: silently consume the mismatched key, keep waiting.
+        return true;
+      }
+      // Non-exclusive (default): cancel the sequence, key falls through.
+      clearTimeout(pending.timer);
+      globalPendingSeqRef.current = null;
+      return false;
+    };
+
+    // Step 1: Global sequences with affectOverlay: true.
+    // These have the highest priority in the entire event chain.
+    // First drain any active global pending sequence, then try to start
+    // a new one from the affectOverlay:true group.
+    if (processGlobalPending()) return;
+    if (tryStartGlobalSequence(globalSequences, true)) return;
 
     // 1. 全局键 affectOverlay: true (在所有浮层之前触发)
     for (const entry of globalKeys) {
@@ -1339,6 +1553,17 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         // 不 break，继续下一个浮层
       }
     }
+
+    // Step 3: Global sequences with affectOverlay: false.
+    // These fire after the overlay layer but before global keys so that
+    // a global sequence always outranks any single-key global binding.
+    // Same helpers (processGlobalPending / tryStartGlobalSequence) are
+    // reused — the pending state carries its own affectOverlay flag so
+    // an affectOverlay:true sequence that started in step 1 will have
+    // already consumed the event and returned above.
+    // @2026-06-13 v3.2.0
+    if (processGlobalPending()) return;
+    if (tryStartGlobalSequence(globalSequences, false)) return;
 
     // 3. 全局键 affectOverlay: false (在浮层广播之后、屏幕栈之前触发)
     for (const entry of globalKeys) {

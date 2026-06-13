@@ -400,6 +400,67 @@ times               | number | undefined | Number of presses needed before handl
 executeWhenNoOverlay | boolean | false | When `affectOverlay: true`, also execute when no overlay is open
 
 ---
+
+### globalSequence
+
+```tsx
+globalSequence(entries: GlobalSequenceEntry[], options?): void;
+```
+
+Register global sequence key bindings with **higher priority** than global keys.
+They match multi-key sequences (e.g. `gg`, `ctrl+w q`) across all screens.
+
+By default (or with `{ mode: 'replace' }`), replaces all previously registered
+global sequences. Pass `{ mode: 'add' }` to append.
+
+**Priority chain** (highest to lowest):
+
+1. globalSequence (affectOverlay: true)
+2. globalKeys (affectOverlay: true)
+3. Overlay layer
+4. globalSequence (affectOverlay: false)
+5. globalKeys (affectOverlay: false)
+6. Screen stack
+
+**Cover**: Only `boundSequence` can override a global sequence — `boundKeyboard`
+cannot. When `cover: false`, calling `boundSequence` with a matching first key
+throws.
+
+**No `times` support**: Unlike global keys, global sequences do not support `times`.
+
+#### GlobalSequenceEntry
+
+Property              | Type     | Default | Description
+--------------------- | -------- | ------- | -----------
+keys                  | string[] | -       | Ordered key names (≥ 2). E.g. `['g', 'g']`
+operate               | () => void | -     | Callback when full sequence is matched
+cover                 | boolean  | true    | Whether `boundSequence` may override
+affectOverlay         | boolean  | false   | Fire before (true) or after (false) overlays
+category              | ComponentType[] or `'*'` or undefined | `'*'` | Screen whitelist
+timeout               | number   | 500     | Max time (ms) between key presses
+exclusive             | boolean  | false   | If true, mismatched keys consumed silently
+executeWhenNoOverlay  | boolean  | false   | When `affectOverlay: true`, fire without overlay
+
+```tsx
+// 'gg' shortcut anywhere
+globalSequence([
+  { keys: ['g', 'g'], operate: () => gotoScreen(Settings) },
+]);
+
+// With affectOverlay + exclusive mode
+globalSequence([
+  {
+    keys: ['ctrl+w', 'q'],
+    operate: closeTab,
+    affectOverlay: true,
+    exclusive: true,
+    timeout: 1000,
+  },
+]);
+```
+
+---
+
 ### boundSequence
 
 ```tsx

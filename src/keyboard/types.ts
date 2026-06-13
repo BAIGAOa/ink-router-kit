@@ -311,6 +311,83 @@ export interface GlobalKeyEntry {
 }
 
 /**
+ * A single global sequence key definition.
+ *
+ * Global sequence keys fire regardless of the screen stack, with higher
+ * priority than {@link GlobalKeyEntry}. They match multi-key sequences
+ * (e.g. `['g', 'g']`, `['ctrl+w', 'q']`) instead of single key presses.
+ *
+ * Unlike global keys, global sequences do NOT support `times`.
+ *
+ * @see {@link KeyboardContextValue.globalSequence}
+ */
+export interface GlobalSequenceEntry {
+  /**
+   * Ordered key names that make up the sequence (e.g. `['g', 'g']`,
+   * `['ctrl+w', 'q']`). Must have length ≥ 2.
+   */
+  keys: string[];
+
+  /** Callback to invoke when the full sequence is matched. */
+  operate: () => void;
+
+  /**
+   * Whether screen components are allowed to override this global sequence
+   * via `boundSequence`. Only sequence bindings can override — ordinary
+   * `boundKeyboard` bindings are never checked against global sequences.
+   *
+   * @default true
+   */
+  cover?: boolean;
+
+  /**
+   * Whether this global sequence fires before the overlay layer.
+   *
+   * - `false` (default): overlay → global sequence → … → screen stack
+   * - `true`:            global sequence → overlay → … → screen stack
+   */
+  affectOverlay?: boolean;
+
+  /**
+   * Whitelist of screen components that may use this global sequence.
+   *
+   * - `"*"` or omitted: all screens
+   * - `[]`: no screens (effectively disabled)
+   * - `[Menu, Game]`: only when the stack top is exactly Menu or Game
+   */
+  category?: React.ComponentType<any>[] | "*";
+
+  /**
+   * Maximum time in milliseconds between key presses within the sequence.
+   * The timer starts when the first key is pressed and resets on each
+   * matching key. If it expires before the full sequence is entered, the
+   * pending state is cancelled.
+   *
+   * @default 500
+   */
+  timeout?: number;
+
+  /**
+   * Controls behaviour when a key is pressed that does NOT match the
+   * next key expected by the pending sequence.
+   *
+   * - `false` (default): the mismatched key **cancels** the pending
+   *   sequence and falls through to lower-priority handlers.
+   * - `true`: the mismatched key is **silently consumed** — the sequence
+   *   keeps waiting until the timeout expires or the correct key arrives.
+   */
+  exclusive?: boolean;
+
+  /**
+   * When `affectOverlay` is `true` but no overlays are active, setting
+   * this to `true` makes the global sequence still fire (acting on the
+   * screen stack instead). When `false` (default), `affectOverlay: true`
+   * global sequences only fire when at least one overlay is active.
+   */
+  executeWhenNoOverlay?: boolean;
+}
+
+/**
  * Type definition for shortcut
  */
 export interface ShortcutOperationEntry {

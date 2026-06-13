@@ -5,6 +5,7 @@ import type {
   BlockedKeyOptions,
   StopOptions,
   GlobalKeyEntry,
+  GlobalSequenceEntry,
   ShortcutOperationEntry,
   SequenceOptions,
 } from "./types.js";
@@ -80,6 +81,42 @@ export interface KeyboardContextValue {
    */
   globalKeys: (
     entries: GlobalKeyEntry[],
+    options?: { mode?: "replace" | "add" },
+  ) => void;
+
+  /**
+   * Register global sequence key bindings.
+   *
+   * Global sequences fire independently of the screen stack with higher
+   * priority than {@link globalKeys}. They match multi-key sequences
+   * instead of single key presses.
+   *
+   * By default (or with `{ mode: 'replace' }`), replaces all previously
+   * registered global sequences. Pass `{ mode: 'add' }` to append without
+   * removing existing entries.
+   *
+   * **Priority chain**: global sequences are evaluated before global keys
+   * in both the `affectOverlay: true` and `affectOverlay: false` stages:
+   *   1. globalSequence(affectOverlay:true)
+   *   2. globalKeys(affectOverlay:true)
+   *   3. overlay layer
+   *   4. globalSequence(affectOverlay:false)
+   *   5. globalKeys(affectOverlay:false)
+   *   6. screen stack
+   *
+   * **Cover**: Only `boundSequence` can override a global sequence (not
+   * `boundKeyboard`). When `cover: false`, `boundSequence` with the same
+   * first key throws.
+   *
+   * **No `times` support**: Unlike `globalKeys`, global sequences do not
+   * support the `times` option.
+   *
+   * @param entries  Array of global sequence definitions.
+   * @param options  Optional: `{ mode: 'replace' | 'add' }`. Default `'replace'`.
+   * @throws If any `keys` array has length < 2.
+   */
+  globalSequence: (
+    entries: GlobalSequenceEntry[],
     options?: { mode?: "replace" | "add" },
   ) => void;
 

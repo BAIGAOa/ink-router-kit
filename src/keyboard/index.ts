@@ -10,6 +10,7 @@ export type {
   ScreenKeyboardLayer,
   FocusTarget,
   GlobalKeyEntry,
+  GlobalSequenceEntry,
   ShortcutOperationEntry,
   SequenceOptions,
   SequenceBinding,

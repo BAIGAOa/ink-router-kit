@@ -39,6 +39,8 @@ export type {
   BoundKeyEntry,
   ScreenKeyboardLayer,
   KeyboardProviderProps,
+  GlobalKeyEntry,
+  GlobalSequenceEntry,
 } from "./keyboard/index.js";
 
 export type {
