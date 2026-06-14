@@ -99,9 +99,16 @@ function tryStartGlobalSequence(
  *
  * @2026-06-14 v3.4.0
  */
-function processGlobalPending(ctx: PipelineContext): boolean {
+function processGlobalPending(ctx: PipelineContext, affectOverlay: boolean): boolean {
   const pending = ctx.pendingSeqRef.current;
   if (pending === null) return false;
+
+  // Only process the pending sequence in the stage that matches its
+  // affectOverlay group — otherwise a pending sequence started in
+  // stage ④ (affectOverlay: false) would have its continuation
+  // consumed by stage ① (affectOverlay: true), bypassing the
+  // overlay layer.
+  if (pending.affectOverlay !== affectOverlay) return false;
 
   if (pending.affectOverlay && ctx.activeCount === 0 && !pending.executeWhenNoOverlay) {
     clearTimeout(pending.timer);
@@ -152,7 +159,7 @@ export function createGlobalSequenceProcessor(config: {
   const { affectOverlay } = config;
   return {
     process(ctx: PipelineContext): boolean {
-      if (processGlobalPending(ctx)) return true;
+      if (processGlobalPending(ctx, affectOverlay)) return true;
       if (tryStartGlobalSequence(ctx.globalSequences, affectOverlay, ctx)) return true;
       return false;
     },
