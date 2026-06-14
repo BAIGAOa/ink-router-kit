@@ -1,4 +1,5 @@
 import type { Key } from "ink";
+import type { OverlayEntry } from "../screen/types.js";
 
 /**
  * Keyboard callback, matching Ink's `useInput` signature.
@@ -441,4 +442,91 @@ export interface SequenceOperationEntry {
  */
 export interface ResolvedGlobalSequenceEntry extends Omit<GlobalSequenceEntry, 'operate'> {
   operate: () => void;
+}
+
+/**
+ * Internal type: {@link GlobalKeyEntry} after string `operate`
+ * references have been resolved to callable functions and `pressCount`
+ * has been initialized for entries with a `times` option.
+ *
+ * Used by the keyboard provider's refs after `globalKeys()` resolves
+ * action IDs. Public API continues to accept `GlobalKeyEntry` with
+ * `operate: string | (() => void)`.
+ */
+export interface ResolvedGlobalKeyEntry {
+  key: string | string[];
+  operate: () => void;
+  cover?: boolean;
+  affectOverlay?: boolean;
+  category?: React.ComponentType<any>[] | '*';
+  times?: number;
+  pressCount?: number;
+  executeWhenNoOverlay?: boolean;
+}
+
+/**
+ * Internal state for a global multi-key sequence that is currently being
+ * matched across consecutive key presses.
+ *
+ * Created by the global sequence processor when the first key of a
+ * registered {@link GlobalSequenceEntry} matches, and consumed when the
+ * full sequence completes or times out.
+ */
+export interface GlobalPendingSequence {
+  sequences: string[];
+  nextIndex: number;
+  handler: () => void;
+  timer: ReturnType<typeof setTimeout>;
+  timeout: number;
+  exclusive: boolean;
+  affectOverlay: boolean;
+  cover: boolean;
+  category?: React.ComponentType<any>[] | '*';
+  executeWhenNoOverlay?: boolean;
+}
+
+/**
+ * Snapshot of all mutable state needed to process a single key event
+ * through the keyboard pipeline.
+ *
+ * Created once per event by {@link buildPipelineContext}. Immutable
+ * snapshot fields reflect the state at the moment the event arrived;
+ * mutable coordination fields allow cross-processor communication
+ * within a single pipeline run.
+ *
+ * @2026-06-14 v3.4.0
+ */
+export interface PipelineContext {
+  // --- Immutable per-event snapshots ---
+  readonly input: string;
+  readonly key: Key;
+  readonly eventNames: string[];
+  readonly topComponent: React.ComponentType<any> | null;
+  readonly globalKeys: ResolvedGlobalKeyEntry[];
+  readonly globalSequences: ResolvedGlobalSequenceEntry[];
+  readonly activeOverlays: OverlayEntry[];
+  readonly activeCount: number;
+  readonly wildcardFirst: boolean;
+  readonly screenPath: React.ComponentType<any>[];
+
+  // --- Mutable refs (shared with provider) ---
+  readonly layersRef: React.MutableRefObject<Map<React.ComponentType<any> | string, ScreenKeyboardLayer>>;
+  readonly pendingSeqRef: React.MutableRefObject<GlobalPendingSequence | null>;
+
+  // --- Callbacks ---
+  readonly notifyFocusChange: () => void;
+
+  // --- Mutable pipeline coordination state ---
+  anyOverlayConsumed: boolean;
+}
+
+/**
+ * A single stage in the keyboard event pipeline.
+ *
+ * Each processor evaluates whether it should handle the current event.
+ * If it consumes the event it returns `true` and the chain stops;
+ * otherwise it returns `false` to pass the event to the next processor.
+ */
+export interface PipelineProcessor {
+  process(ctx: PipelineContext): boolean;
 }
